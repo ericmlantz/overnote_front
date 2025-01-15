@@ -45,7 +45,7 @@ async function updateNotesWindowTitle(context) {
             currentContext = context; // Cache the new context
 
             if (notesWindow) {
-                notesWindow.setTitle(`Notes - ${currentContext}`);
+                notesWindow.setTitle(`${currentContext}`);
                 
                 // Send the updated context to the renderer process
                 notesWindow.webContents.send('update-context', currentContext);

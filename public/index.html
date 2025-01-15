@@ -4,13 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notes Window</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        #notes-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            resize: both; /* Allow resizing */
+            box-sizing: border-box;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            outline: none;
+        }
+    </style>
 </head>
 <body>
-    <h1>Notes Window</h1>
-    <div id="context-display">Loading...</div>
     <div id="notes-container">
-        <!-- Notes will be dynamically loaded here -->
-    </div>
     <script src="../src/renderer.js"></script>
 </body>
 </html>
