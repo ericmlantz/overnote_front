@@ -1,23 +1,23 @@
 const ipcRenderer = window.electron.ipcRenderer;
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
+let isLocked = false; // Track the lock state
+let lastLockedContext = null; // Store the locked context
 let lastValidContext = null; // Store the last valid context
-const ignoredTitles = ["History", "Downloads", "Settings", "New Tab"]; // Add titles or patterns to ignore
-let previousContent = ''; // Track the previous state of the textarea
+const ignoredTitles = ["History", "Downloads", "Settings", "New Tab"];
 
 document.addEventListener('DOMContentLoaded', () => {
     const notesContainer = document.getElementById('notes-container');
 
-    // Create a single textarea for all notes
+    // Create a textarea for notes
     const textarea = document.createElement('textarea');
-    textarea.placeholder = 'Write new notes here...';
     textarea.id = 'all-notes';
     textarea.style.width = '100%';
     textarea.style.height = '100%';
-    textarea.style.resize = 'none'; // Prevent resizing for a cleaner UI
+    textarea.placeholder = 'Write your notes here...';
     notesContainer.appendChild(textarea);
 
-    // Fetch notes from the backend for the given context
+    // Fetch notes from the backend
     const fetchNotes = async (context) => {
         try {
             const response = await fetch(
@@ -27,46 +27,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.status === 404) {
                     console.warn(`No existing notes found for context: ${context}`);
                     textarea.value = ''; // Initialize with an empty value for new contexts
-                    textarea.dataset.context = context; // Ensure context is set
+                    textarea.dataset.context = context;
                     return;
                 }
                 throw new Error(`Failed to fetch notes: ${response.statusText}`);
             }
-    
+
             const notes = await response.json();
-    
-            // Combine all notes into a single string
             const combinedNotes = notes.map((note) => note.content).join('\n');
             textarea.value = combinedNotes;
-    
-            // Store the current context in the textarea for later use
             textarea.dataset.context = context;
             console.log(`Notes loaded for context: ${context}`);
         } catch (error) {
             console.error('Error fetching notes:', error);
-            textarea.value = ''; // Clear notes if fetch fails
+            textarea.value = '';
         }
     };
 
-    // Save all notes in real-time when the textarea is modified
+    // Save notes to the backend
     const saveAllNotes = async (allContent) => {
         try {
-            console.log('saveAllNotes called with content:', allContent); // Debug log
-    
-            const context = textarea.dataset.context; // Get the current context
+            const context = textarea.dataset.context;
             if (!context) {
                 throw new Error('Context is missing. Unable to save notes.');
             }
-    
-            // Send the full textarea content to replace all notes for the current context
+
             const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ notes: allContent, context }), // Send notes as an array
+                body: JSON.stringify({ notes: allContent.split('\n'), context }),
             });
-    
+
             if (!response.ok) {
                 throw new Error(`Failed to update notes: ${response.statusText}`);
             }
@@ -75,45 +68,66 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error updating notes:', error);
         }
     };
-    
-    // Add an event listener to handle textarea input changes
+
+    // Handle textarea input events
     textarea.addEventListener('input', () => {
         const currentContent = textarea.value;
-    
-        // Save the entire textarea content to the backend
-        saveAllNotes(currentContent.split('\n')); // Split content into lines and save
+        saveAllNotes(currentContent);
     });
 
-    // Listen for context updates from the main process
+    // Handle context updates
     ipcRenderer.on('update-context', async (event, context) => {
         console.log(`Context updated to: ${context}`);
 
-        // Check if the context is in the ignored list
+        if (isLocked) {
+            console.log(`Notes are locked to context: ${lastLockedContext}. Ignoring updates.`);
+            return;
+        }
+
         if (ignoredTitles.some((title) => context.includes(title))) {
             console.warn(`Ignored context detected: ${context}. Falling back to last valid context.`);
             if (lastValidContext) {
-                await fetchNotes(lastValidContext); // Use the last valid context
+                await fetchNotes(lastValidContext);
             } else {
                 console.error('No valid context to fall back to.');
-                textarea.value = ''; // Clear notes if no valid context exists
+                textarea.value = '';
             }
             return;
         }
 
-        // If the context is valid, fetch notes for it
         if (context && context !== 'Error retrieving context') {
-            await fetchNotes(context); // Fetch notes for the new context
+            await fetchNotes(context);
+            lastValidContext = context;
         } else if (lastValidContext) {
-            // If no valid context, fallback to the last valid one
             console.warn('Current context unavailable. Falling back to last valid context.');
             await fetchNotes(lastValidContext);
         } else {
             console.error('No valid context available.');
-            textarea.value = ''; // Clear notes if no valid context exists
+            textarea.value = '';
+        }
+    });
+
+    // Add lock button functionality
+    const lockButton = document.getElementById('lock-button');
+    lockButton.addEventListener('click', async () => {
+        isLocked = !isLocked;
+        if (isLocked) {
+            lastLockedContext = textarea.dataset.context;
+            lockButton.textContent = 'Unlock';
+            console.log(`Notes locked to context: ${lastLockedContext}`);
+        } else {
+            lastLockedContext = null;
+            lockButton.textContent = 'Lock';
+            console.log('Notes unlocked. Resuming dynamic updates.');
+
+            const currentContext = await ipcRenderer.invoke('get-current-context');
+            if (currentContext) {
+                await fetchNotes(currentContext);
+            }
         }
     });
 
     // Load initial notes
-    const initialContext = 'default'; // Replace with actual logic to determine the default context
+    const initialContext = 'default'; // Adjust as necessary
     fetchNotes(initialContext);
 });
