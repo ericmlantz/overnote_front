@@ -9,6 +9,7 @@
   "dependencies": {
     "active-win": "^8.2.1",
     "get-windows": "^9.2.0",
+    "quill": "^2.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

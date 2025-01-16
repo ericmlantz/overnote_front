@@ -104,15 +104,17 @@ async function setupContextListeners() {
 // Function to create the notes window
 function createNotesWindow() {
     notesWindow = new BrowserWindow({
-        width: 400,
-        height: 600,
-        show: false,
+        width: 800,
+        height: 400,
+        show: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'), // Path to preload script
-            contextIsolation: true, // Ensures secure context isolation
+            contextIsolation: true, // Ensure secure context isolation
             nodeIntegration: false, // Prevent direct Node.js access for security
         },
     });
+
+    console.log('Preload Path:', path.join(__dirname, 'preload.js')); // Debugging log
 
     notesWindow.loadFile(path.join(__dirname, '../public/index.html'));
 

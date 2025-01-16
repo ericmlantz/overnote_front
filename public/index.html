@@ -4,41 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notes Window</title>
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
+            display: flex;
+            flex-direction: column;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
         }
 
-        #notes-container {
-            width: 100%;
-            height: 100%;
+        #top-container {
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #f4f4f4;
+            border-bottom: 1px solid #ddd;
+            height: 20%; /* Adjust as needed */
+        }
+
+        #quill-editor {
+            flex: 1;
+            height: 100%; /* Fill the height of the top container */
+            margin-right: 10px;
+            border: 1px solid #ccc;
+        }
+
+        #lock-button {
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        #notes-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 10px;
         }
 
         textarea {
             width: 100%;
             height: 100%;
-            resize: both; /* Allow resizing */
+            resize: none;
             box-sizing: border-box;
             padding: 10px;
             font-size: 16px;
-            border: none;
+            border: 1px solid #ccc;
             outline: none;
         }
     </style>
 </head>
 <body>
-    <div id="controls">
-        <button id="lock-button">Lock</button>
+    <div id="top-container">
+        <div id="quill-editor"></div> <!-- Quill editor at the top -->
+        <button id="lock-button">Lock</button> <!-- Lock button beside the editor -->
     </div>
     <div id="notes-container">
-        <!-- Notes will be dynamically loaded here -->
+        <textarea id="all-notes" placeholder="Notes for the current page..."></textarea>
     </div>
     <script src="../src/renderer.js"></script>
 </body>
+</html>

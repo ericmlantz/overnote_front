@@ -1,33 +1,43 @@
 const ipcRenderer = window.electron.ipcRenderer;
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
-let isLocked = false; // Track the lock state
-let lastLockedContext = null; // Store the locked context
-let lastValidContext = null; // Store the last valid context
+let isLocked = false;
+let lastLockedContext = null;
+let lastValidContext = null;
 const ignoredTitles = ["History", "Downloads", "Settings", "New Tab"];
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('Renderer process loaded.');
+
     const notesContainer = document.getElementById('notes-container');
 
-    // Create a textarea for notes
-    const textarea = document.createElement('textarea');
-    textarea.id = 'all-notes';
-    textarea.style.width = '100%';
-    textarea.style.height = '100%';
-    textarea.placeholder = 'Write your notes here...';
-    notesContainer.appendChild(textarea);
+    // Create a div for the Quill editor
+    const editorDiv = document.createElement('div');
+    editorDiv.id = 'quill-editor';
+    notesContainer.appendChild(editorDiv);
 
-    // Fetch notes from the backend
+    // Initialize Quill editor
+    const quill = new Quill('#quill-editor', {
+        theme: 'snow',
+        placeholder: 'Write your notes here...',
+        modules: {
+            toolbar: [
+                ['bold', 'italic', 'underline'], // Formatting options
+                [{ list: 'ordered' }, { list: 'bullet' }], // Lists
+                ['link', 'image'], // Links and images
+            ],
+        },
+    });
+
+    // Fetch notes for a given context and set them in Quill
     const fetchNotes = async (context) => {
         try {
-            const response = await fetch(
-                `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
-            );
+            const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn(`No existing notes found for context: ${context}`);
-                    textarea.value = ''; // Initialize with an empty value for new contexts
-                    textarea.dataset.context = context;
+                    quill.setText(''); // Clear Quill editor for new contexts
+                    editorDiv.dataset.context = context; // Set the context
                     return;
                 }
                 throw new Error(`Failed to fetch notes: ${response.statusText}`);
@@ -35,29 +45,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const notes = await response.json();
             const combinedNotes = notes.map((note) => note.content).join('\n');
-            textarea.value = combinedNotes;
-            textarea.dataset.context = context;
+            quill.root.innerHTML = combinedNotes; // Set notes as HTML in Quill editor
+            editorDiv.dataset.context = context; // Store the context
             console.log(`Notes loaded for context: ${context}`);
         } catch (error) {
             console.error('Error fetching notes:', error);
-            textarea.value = '';
+            quill.setText(''); // Clear editor on error
         }
     };
 
-    // Save notes to the backend
-    const saveAllNotes = async (allContent) => {
+    // Save all notes in Quill to the backend
+    const saveAllNotes = async () => {
         try {
-            const context = textarea.dataset.context;
+            const context = editorDiv.dataset.context; // Get the current context
             if (!context) {
                 throw new Error('Context is missing. Unable to save notes.');
             }
 
+            const content = quill.root.innerHTML; // Get HTML content from Quill editor
             const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ notes: allContent.split('\n'), context }),
+                body: JSON.stringify({ notes: [content], context }), // Send notes as an array
             });
 
             if (!response.ok) {
@@ -69,13 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Handle textarea input events
-    textarea.addEventListener('input', () => {
-        const currentContent = textarea.value;
-        saveAllNotes(currentContent);
+    // Listen for changes in the Quill editor and save notes
+    quill.on('text-change', () => {
+        saveAllNotes();
     });
 
-    // Handle context updates
+    // Handle context updates from the main process
     ipcRenderer.on('update-context', async (event, context) => {
         console.log(`Context updated to: ${context}`);
 
@@ -90,22 +100,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 await fetchNotes(lastValidContext);
             } else {
                 console.error('No valid context to fall back to.');
-                textarea.value = '';
+                quill.setText('');
             }
             return;
         }
-        
+
         if (context && context !== 'Error retrieving context') {
-            textarea.dataset.context = context; // Update the current context
-            await fetchNotes(context); // Fetch notes for the new context
+            await fetchNotes(context);
             lastValidContext = context;
         } else if (lastValidContext) {
             console.warn('Current context unavailable. Falling back to last valid context.');
             await fetchNotes(lastValidContext);
         } else {
             console.error('No valid context available.');
-            textarea.value = '';
-            textarea.dataset.context = '';
+            quill.setText('');
         }
     });
 
@@ -113,17 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockButton = document.getElementById('lock-button');
     lockButton.addEventListener('click', async () => {
         isLocked = !isLocked;
-    
         if (isLocked) {
-            lastLockedContext = textarea.dataset.context; // Set the locked context
-            lockButton.textContent = `Locked on ${lastLockedContext}`; // Update the button text
+            lastLockedContext = editorDiv.dataset.context;
+            lockButton.textContent = `Locked on ${lastLockedContext}`;
             console.log(`Notes locked to context: ${lastLockedContext}`);
         } else {
-            lastLockedContext = null; // Clear the locked context
-            lockButton.textContent = 'Lock'; // Reset the button text
+            lastLockedContext = null;
+            lockButton.textContent = 'Lock';
             console.log('Notes unlocked. Resuming dynamic updates.');
-    
-            // Fetch the current context and update notes
+
             const currentContext = await ipcRenderer.invoke('get-current-context');
             if (currentContext) {
                 await fetchNotes(currentContext);
@@ -132,6 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load initial notes
-    const initialContext = 'default'; // Adjust as necessary
+    const initialContext = 'default';
     fetchNotes(initialContext);
 });
