@@ -94,9 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-
+        
         if (context && context !== 'Error retrieving context') {
-            await fetchNotes(context);
+            textarea.dataset.context = context; // Update the current context
+            await fetchNotes(context); // Fetch notes for the new context
             lastValidContext = context;
         } else if (lastValidContext) {
             console.warn('Current context unavailable. Falling back to last valid context.');
@@ -104,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             console.error('No valid context available.');
             textarea.value = '';
+            textarea.dataset.context = '';
         }
     });
 
@@ -111,15 +113,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockButton = document.getElementById('lock-button');
     lockButton.addEventListener('click', async () => {
         isLocked = !isLocked;
+    
         if (isLocked) {
-            lastLockedContext = textarea.dataset.context;
-            lockButton.textContent = 'Unlock';
+            lastLockedContext = textarea.dataset.context; // Set the locked context
+            lockButton.textContent = `Locked on ${lastLockedContext}`; // Update the button text
             console.log(`Notes locked to context: ${lastLockedContext}`);
         } else {
-            lastLockedContext = null;
-            lockButton.textContent = 'Lock';
+            lastLockedContext = null; // Clear the locked context
+            lockButton.textContent = 'Lock'; // Reset the button text
             console.log('Notes unlocked. Resuming dynamic updates.');
-
+    
+            // Fetch the current context and update notes
             const currentContext = await ipcRenderer.invoke('get-current-context');
             if (currentContext) {
                 await fetchNotes(currentContext);
