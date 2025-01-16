@@ -47,30 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
             textarea.value = ''; // Clear notes if fetch fails
         }
     };
-    // const fetchNotes = async (context) => {
-    //     try {
-    //         const response = await fetch(
-    //             `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
-    //         );
-    //         if (!response.ok) {
-    //             throw new Error(`Failed to fetch notes: ${response.statusText}`);
-    //         }
-    //         const notes = await response.json();
-
-    //         // Combine all notes into a single string
-    //         const combinedNotes = notes.map((note) => note.content).join('\n');
-    //         textarea.value = combinedNotes;
-
-    //         // Store the current context in the textarea for later use
-    //         textarea.dataset.context = context;
-
-    //         // Update the last valid context and the previous content
-    //         lastValidContext = context;
-    //         previousContent = combinedNotes;
-    //     } catch (error) {
-    //         console.error('Error fetching notes:', error);
-    //     }
-    // };
 
     // Save all notes in real-time when the textarea is modified
     const saveAllNotes = async (allContent) => {
@@ -99,30 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error updating notes:', error);
         }
     };
-    // const saveAllNotes = async (allContent) => {
-    //     try {
-    //         const context = textarea.dataset.context; // Use a dataset attribute to store the current context
-    //         if (!context) {
-    //             throw new Error('Context is missing. Unable to save notes.');
-    //         }
     
-    //         const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
-    //             method: 'PUT',
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //             },
-    //             body: JSON.stringify({ notes: allContent, context }), // Send the entire content as an array of lines
-    //         });
-    
-    //         if (!response.ok) {
-    //             throw new Error(`Failed to update notes: ${response.statusText}`);
-    //         }
-    //         console.log('Notes updated successfully for context:', context);
-    //     } catch (error) {
-    //         console.error('Error updating notes:', error);
-    //     }
-    // };
-
     // Add an event listener to handle textarea input changes
     textarea.addEventListener('input', () => {
         const currentContent = textarea.value;
