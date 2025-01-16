@@ -2,7 +2,7 @@ const ipcRenderer = window.electron.ipcRenderer;
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
 
 let lastValidContext = null; // Store the last valid context
-const ignoredTitles = ["History", "Downloads", "Settings"]; // Add titles or patterns to ignore
+const ignoredTitles = ["History", "Downloads", "Settings", "New Tab"]; // Add titles or patterns to ignore
 let previousContent = ''; // Track the previous state of the textarea
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const textarea = document.createElement('textarea');
     textarea.placeholder = 'Write new notes here...';
     textarea.id = 'all-notes';
+    textarea.style.width = '100%';
+    textarea.style.height = '100%';
+    textarea.style.resize = 'none'; // Prevent resizing for a cleaner UI
     notesContainer.appendChild(textarea);
 
     // Fetch notes from the backend for the given context
@@ -21,29 +24,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
             );
             if (!response.ok) {
+                if (response.status === 404) {
+                    console.warn(`No existing notes found for context: ${context}`);
+                    textarea.value = ''; // Initialize with an empty value for new contexts
+                    textarea.dataset.context = context; // Ensure context is set
+                    return;
+                }
                 throw new Error(`Failed to fetch notes: ${response.statusText}`);
             }
+    
             const notes = await response.json();
-
+    
             // Combine all notes into a single string
             const combinedNotes = notes.map((note) => note.content).join('\n');
             textarea.value = combinedNotes;
-
+    
             // Store the current context in the textarea for later use
             textarea.dataset.context = context;
-
-            // Update the last valid context and the previous content
-            lastValidContext = context;
-            previousContent = combinedNotes;
+            console.log(`Notes loaded for context: ${context}`);
         } catch (error) {
             console.error('Error fetching notes:', error);
+            textarea.value = ''; // Clear notes if fetch fails
         }
     };
+    // const fetchNotes = async (context) => {
+    //     try {
+    //         const response = await fetch(
+    //             `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
+    //         );
+    //         if (!response.ok) {
+    //             throw new Error(`Failed to fetch notes: ${response.statusText}`);
+    //         }
+    //         const notes = await response.json();
+
+    //         // Combine all notes into a single string
+    //         const combinedNotes = notes.map((note) => note.content).join('\n');
+    //         textarea.value = combinedNotes;
+
+    //         // Store the current context in the textarea for later use
+    //         textarea.dataset.context = context;
+
+    //         // Update the last valid context and the previous content
+    //         lastValidContext = context;
+    //         previousContent = combinedNotes;
+    //     } catch (error) {
+    //         console.error('Error fetching notes:', error);
+    //     }
+    // };
 
     // Save all notes in real-time when the textarea is modified
     const saveAllNotes = async (allContent) => {
         try {
-            const context = textarea.dataset.context; // Use a dataset attribute to store the current context
+            console.log('saveAllNotes called with content:', allContent); // Debug log
+    
+            const context = textarea.dataset.context; // Get the current context
             if (!context) {
                 throw new Error('Context is missing. Unable to save notes.');
             }
@@ -54,24 +88,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ notes: allContent, context }), // Send the entire content as an array of lines
+                body: JSON.stringify({ notes: allContent, context }), // Send notes as an array
             });
     
             if (!response.ok) {
                 throw new Error(`Failed to update notes: ${response.statusText}`);
             }
-            console.log('Notes updated successfully.');
+            console.log('Notes updated successfully for context:', context);
         } catch (error) {
             console.error('Error updating notes:', error);
         }
     };
+    // const saveAllNotes = async (allContent) => {
+    //     try {
+    //         const context = textarea.dataset.context; // Use a dataset attribute to store the current context
+    //         if (!context) {
+    //             throw new Error('Context is missing. Unable to save notes.');
+    //         }
+    
+    //         const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
+    //             method: 'PUT',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //             },
+    //             body: JSON.stringify({ notes: allContent, context }), // Send the entire content as an array of lines
+    //         });
+    
+    //         if (!response.ok) {
+    //             throw new Error(`Failed to update notes: ${response.statusText}`);
+    //         }
+    //         console.log('Notes updated successfully for context:', context);
+    //     } catch (error) {
+    //         console.error('Error updating notes:', error);
+    //     }
+    // };
 
     // Add an event listener to handle textarea input changes
     textarea.addEventListener('input', () => {
         const currentContent = textarea.value;
     
         // Save the entire textarea content to the backend
-        saveAllNotes(currentContent.split('\n'));
+        saveAllNotes(currentContent.split('\n')); // Split content into lines and save
     });
 
     // Listen for context updates from the main process

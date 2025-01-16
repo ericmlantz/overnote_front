@@ -37,6 +37,7 @@ async function getCurrentContext() {
         return 'Error retrieving context';
     }
 }
+
 // Function to update the notes window title dynamically
 async function updateNotesWindowTitle(context) {
     try {
