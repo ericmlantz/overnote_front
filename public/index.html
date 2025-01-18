@@ -19,19 +19,22 @@
 
         #top-container {
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            padding: 10px;
             background: #f4f4f4;
             border-bottom: 1px solid #ddd;
-            height: 20%; /* Adjust as needed */
+            height: 100%; /* Adjust as needed */
+            flex-direction: column;
         }
 
         #quill-editor {
             flex: 1;
+            width: 100%;
             height: 100%; /* Fill the height of the top container */
-            margin-right: 10px;
-            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        .buttons {
+            margin: 10px auto;
         }
 
         #lock-button {
@@ -40,33 +43,21 @@
             cursor: pointer;
         }
 
-        #notes-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            padding: 10px;
+        #refresh-button {
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
         }
 
-        textarea {
-            width: 100%;
-            height: 100%;
-            resize: none;
-            box-sizing: border-box;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            outline: none;
-        }
     </style>
 </head>
 <body>
     <div id="top-container">
-        <div id="quill-editor"></div> <!-- Quill editor at the top -->
+        <div class="buttons">
         <button id="lock-button">Lock</button> <!-- Lock button beside the editor -->
+        <button id="refresh-button">Refresh</button>
     </div>
-    <div id="notes-container">
-        <textarea id="all-notes" placeholder="Notes for the current page..."></textarea>
+        <div id="quill-editor"></div> <!-- Quill editor at the top -->
     </div>
     <script src="../src/renderer.js"></script>
 </body>

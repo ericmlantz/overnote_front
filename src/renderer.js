@@ -1,6 +1,4 @@
 const Quill = window.Quill
-const path = window.electron.path
-console.log('Path module loaded:', path)
 const ipcRenderer = window.electron.ipcRenderer
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000'
 
@@ -12,12 +10,13 @@ const ignoredTitles = ['History', 'Downloads', 'Settings', 'New Tab']
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Renderer process loaded.')
 
-  const notesContainer = document.getElementById('notes-container')
+  // const notesContainer = document.getElementById('notes-container');
+  const quillEditor = document.getElementById('quill-editor')
 
   // Create a div for the Quill editor
   const editorDiv = document.createElement('div')
   editorDiv.id = 'quill-editor'
-  notesContainer.appendChild(editorDiv)
+  quillEditor.appendChild(editorDiv)
 
   // Initialize Quill editor
   const quill = new Quill('#quill-editor', {
@@ -34,30 +33,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch notes for a given context and set them in Quill
   const fetchNotes = async (context) => {
-    console.log(`Fetching notes for context: ${context}`);
+    console.log(`Fetching notes for context: ${context}`)
     try {
-        const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`);
-        if (!response.ok) {
-            if (response.status === 404) {
-                console.warn(`No notes found for context: ${context}`);
-                quill.setText(''); // Clear the editor for empty contexts
-                editorDiv.dataset.context = context; // Update the editor's context
-                return;
-            }
-            throw new Error(`Failed to fetch notes: ${response.statusText}`);
+      const response = await fetch(
+        `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
+      )
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`No notes found for context: ${context}`)
+          quill.setText('') // Clear the editor for empty contexts
+          editorDiv.dataset.context = context // Update the editor's context
+          return
         }
+        throw new Error(`Failed to fetch notes: ${response.statusText}`)
+      }
 
-        const notes = await response.json();
-        console.log('Fetched notes:', notes);
+      const notes = await response.json()
+      console.log('Fetched notes:', notes)
 
-        const combinedNotes = notes.map((note) => note.content).join('');
-        quill.root.innerHTML = combinedNotes; // Update the Quill editor
-        editorDiv.dataset.context = context; // Store the current context
+      const combinedNotes = notes.map((note) => note.content).join('')
+      quill.root.innerHTML = combinedNotes // Update the Quill editor
+      editorDiv.dataset.context = context // Store the current context
     } catch (error) {
-        console.error('Error fetching notes:', error);
-        quill.setText(''); // Clear the editor on error
+      console.error('Error fetching notes:', error)
+      quill.setText('') // Clear the editor on error
     }
-};
+  }
 
   // Save notes when there are changes in the editor
   const saveAllNotes = async (allContent) => {
@@ -93,36 +94,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle context updates from the main process
   ipcRenderer.on('update-context', async (event, context) => {
-    console.log(`Context updated to: ${context}`);
+    console.log(`Context updated to: ${context}`)
 
     if (isLocked) {
-        console.log(`Notes are locked to context: ${lastLockedContext}. Ignoring updates.`);
-        return; // Skip updates when locked
+      console.log(
+        `Notes are locked to context: ${lastLockedContext}. Ignoring updates.`
+      )
+      return // Skip updates when locked
     }
 
     if (ignoredTitles.some((title) => context.includes(title))) {
-        console.warn(`Ignored context detected: ${context}. Falling back to last valid context.`);
-        if (lastValidContext) {
-            await fetchNotes(lastValidContext); // Use the last valid context
-        } else {
-            console.error('No valid context to fall back to.');
-            quill.setText('');
-        }
-        return;
+      console.warn(
+        `Ignored context detected: ${context}. Falling back to last valid context.`
+      )
+      if (lastValidContext) {
+        await fetchNotes(lastValidContext) // Use the last valid context
+      } else {
+        console.error('No valid context to fall back to.')
+        quill.setText('')
+      }
+      return
     }
 
     if (context && context !== 'Error retrieving context') {
-        await fetchNotes(context); // Fetch notes for the new context
-        lastValidContext = context; // Update the last valid context
+      await fetchNotes(context) // Fetch notes for the new context
+      lastValidContext = context // Update the last valid context
     } else if (lastValidContext) {
-        console.warn('Current context unavailable. Falling back to last valid context.');
-        await fetchNotes(lastValidContext); // Fallback to the last valid context
+      console.warn(
+        'Current context unavailable. Falling back to last valid context.'
+      )
+      await fetchNotes(lastValidContext) // Fallback to the last valid context
     } else {
-        console.error('No valid context available.');
-        quill.setText(''); // Clear notes if no valid context exists
+      console.error('No valid context available.')
+      quill.setText('') // Clear notes if no valid context exists
     }
-});
+  })
+
+  // Add lock button functionality
   const lockButton = document.getElementById('lock-button')
+
+// Lock Button On Click
   lockButton.addEventListener('click', async () => {
     isLocked = !isLocked // Toggle the lock state
 
@@ -145,6 +156,36 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentContext) {
         await fetchNotes(currentContext) // Refresh notes for the current context
       }
+    }
+  })
+  // Handle hover behavior
+  lockButton.addEventListener('mouseover', () => {
+    if (isLocked) {
+      lockButton.dataset.originalText = lockButton.textContent // Store the original text
+      lockButton.textContent = 'Unlock'
+    }
+  })
+
+  lockButton.addEventListener('mouseout', () => {
+    if (isLocked && lockButton.dataset.originalText) {
+      lockButton.textContent = lockButton.dataset.originalText // Restore the original text
+    }
+  })
+
+  // Add refresh button functionality
+  const refreshButton = document.getElementById('refresh-button')
+  refreshButton.addEventListener('click', async () => {
+    console.log('Refresh button clicked. Re-fetching the current context...')
+    try {
+      const currentContext = await ipcRenderer.invoke('get-current-context')
+      if (currentContext) {
+        console.log(`Refreshing notes for context: ${currentContext}`)
+        await fetchNotes(currentContext) // Re-fetch notes for the active context
+      } else {
+        console.error('No valid context found during refresh.')
+      }
+    } catch (error) {
+      console.error('Error refreshing context:', error)
     }
   })
 
