@@ -5,6 +5,7 @@ const { getActiveAppContext } = require('./active-window') // Import context-fet
 let tray = null
 let notesWindow = null
 let currentContext = ''
+let allNotesWindow = null
 
 // Prevent multiple registrations of the same IPC handler
 if (!ipcMain.eventNames().includes('get-current-context')) {
@@ -145,6 +146,30 @@ function toggleNotesWindow() {
   }
 }
 
+function openAllNotesWindow() {
+    if (allNotesWindow) {
+        allNotesWindow.focus()
+        return
+    }
+
+    allNotesWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    })
+
+    allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'))
+    
+    allNotesWindow.on('closed', () => {
+        allNotesWindow = null
+    })
+}
+
 // App ready event
 app.on('ready', () => {
   const iconPath = path.join(__dirname, '../public', 'overnote_icon.png')
@@ -164,6 +189,10 @@ app.on('ready', () => {
       {
         label: 'Open Notes',
         click: () => toggleNotesWindow()
+      },
+      {
+        label: 'Show all Notes',
+        click: () => openAllNotesWindow()
       },
       { 
         label: 'Quit',

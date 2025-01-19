@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Notes</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+        #context-list {
+            width: 25%;
+            border-right: 1px solid #ccc;
+            overflow-y: auto;
+        }
+        #notes-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #search-bar {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        #notes-container {
+            flex: 1;
+            padding: 10px;
+        }
+        .context-item {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .context-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="context-list"></div>
+    <div id="notes-view">
+        <input id="search-bar" placeholder="Search contexts..." />
+        <div id="notes-container">Select a context to view notes</div>
+    </div>
+    <script src="../src/all-notes.js"></script>
+</body>
+</html>
