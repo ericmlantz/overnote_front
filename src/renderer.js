@@ -173,21 +173,21 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   // Add refresh button functionality
-  const refreshButton = document.getElementById('refresh-button')
-  refreshButton.addEventListener('click', async () => {
-    console.log('Refresh button clicked. Re-fetching the current context...')
-    try {
-      const currentContext = await ipcRenderer.invoke('get-current-context')
-      if (currentContext) {
-        console.log(`Refreshing notes for context: ${currentContext}`)
-        await fetchNotes(currentContext) // Re-fetch notes for the active context
-      } else {
-        console.error('No valid context found during refresh.')
-      }
-    } catch (error) {
-      console.error('Error refreshing context:', error)
-    }
-  })
+  const refreshButton = document.getElementById('refresh-button');
+    refreshButton.addEventListener('click', async () => {
+        console.log('Refresh button clicked. Re-fetching the current context...');
+        try {
+            const currentContext = await ipcRenderer.invoke('get-current-context');
+            if (currentContext) {
+                console.log(`Refreshing notes for context: ${currentContext}`);
+                await fetchNotes(currentContext); // Update the notes for the refreshed context
+            } else {
+                console.error('No valid context found during refresh.');
+            }
+        } catch (error) {
+            console.error('Error refreshing context:', error);
+        }
+    });
 
   // Load initial notes
   const initialContext = 'default'
