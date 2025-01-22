@@ -19,6 +19,12 @@ if (!ipcMain.eventNames().includes('get-current-context')) {
     }
   })
 }
+ipcMain.on('toggle-always-on-top', (event, isAlwaysOnTop) => {
+    if (notesWindow) {
+        notesWindow.setAlwaysOnTop(isAlwaysOnTop);
+        console.log(`Always on Top set to: ${isAlwaysOnTop}`);
+    }
+});
 
 // Function to get the current active window's context
 async function getCurrentContext() {
@@ -111,9 +117,10 @@ async function setupContextListeners() {
 // Function to create the notes window
 function createNotesWindow() {
   notesWindow = new BrowserWindow({
-    width: 800,
+    width: 400,
     height: 400,
     show: false,
+    alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), // Path to preload script
       contextIsolation: true, // Ensure secure context isolation
@@ -138,12 +145,30 @@ function createNotesWindow() {
 
 // Function to toggle the visibility of the notes window
 function toggleNotesWindow() {
-  if (notesWindow.isVisible()) {
-    notesWindow.hide()
-  } else {
-    notesWindow.show()
-    getCurrentContext().then((context) => updateNotesWindowTitle(context)) // Update the title with the current context
-  }
+    if (!tray || !notesWindow) return;
+
+    const trayBounds = tray.getBounds(); // Get the tray icon's bounds
+    console.log(trayBounds)
+    const windowBounds = notesWindow.getBounds(); // Get the current notes window size
+
+    // Calculate the position for the notes window
+    const x = Math.round((trayBounds.x - windowBounds.width) + trayBounds.width); // Position to the left of the tray icon
+    const y = Math.round(trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2); // Center vertically with the tray icon
+
+    // Set the notes window position
+    notesWindow.setBounds({
+        x: x,
+        y: y,
+        width: windowBounds.width,
+        height: windowBounds.height,
+    });
+
+    if (notesWindow.isVisible()) {
+        notesWindow.hide();
+    } else {
+        notesWindow.show();
+        getCurrentContext().then((context) => updateNotesWindowTitle(context)); // Update the title with the current context
+    }
 }
 
 function openAllNotesWindow() {
@@ -153,7 +178,7 @@ function openAllNotesWindow() {
     }
 
     allNotesWindow = new BrowserWindow({
-        width: 800,
+        width: 1025,
         height: 600,
         show: true,
         webPreferences: {
@@ -187,11 +212,7 @@ app.on('ready', () => {
   tray.on('right-click', () => {
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Open Notes',
-        click: () => toggleNotesWindow()
-      },
-      {
-        label: 'Show all Notes',
+        label: 'Open All Notes',
         click: () => openAllNotesWindow()
       },
       { 

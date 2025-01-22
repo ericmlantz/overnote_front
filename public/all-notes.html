@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -43,6 +43,120 @@
         <input id="search-bar" placeholder="Search contexts..." />
         <div id="notes-container">Select a context to view notes</div>
     </div>
+    <script src="../src/all-notes.js"></script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Notes</title>
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+    
+        #container {
+
+            display: flex;
+            height: 100vh; /* Full window height */
+            width: 100%; /* 300px (context column) + 725px (notes column) */
+        }
+    
+        #context-list {
+            width: 300px; /* Fixed width for the context column */
+            min-width: 200px;
+            background: #f4f4f4;
+            border-right: 1px solid #ccc;
+            overflow-y: auto;
+            overflow-x: clip;
+        }
+    
+        #context-list h3 {
+            margin: 0;
+            padding: 10px;
+            background: #e5e5e5;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+        }
+    
+        .context-item {
+            max-width: 100%; /* Allow flexible width based on container size */
+            padding: 5px 10px; /* Horizontal padding */
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            transition: background 0.3s;
+        
+            /* Wrapping and truncation */
+            overflow: hidden; /* Hide overflowing text */
+            text-overflow: ellipsis; /* Display ellipsis for overflowing content */
+            display: -webkit-box;
+            -webkit-line-clamp: 3; /* Limit to 3 lines */
+            -webkit-box-orient: vertical;
+            word-wrap: break-word; /* Wrap long words */
+        
+            /* Fixed height based on line height and line clamp */
+            line-height: 1.5em; /* Ensure proper spacing between lines */
+        
+            /* Include padding in the box size */
+            box-sizing: border-box;
+        }
+    
+        .context-item:hover {
+            background: #ddd;
+        }
+    
+        .context-item.selected {
+            background: #cce5ff;
+            font-weight: bold;
+        }
+    
+        #notes-view {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+    
+        #quill-editor {
+            flex: 1;
+            border: 1px solid #ccc;
+        }
+    
+        #save-button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    
+        #save-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="context-list">
+            <h3>Contexts</h3>
+            <ul id="contexts" style="list-style: none; padding: 0; margin: 0;"></ul>
+        </div>
+        <div id="notes-view">
+            <div id="notes-header" style="font-size: 20px; font-weight: bold; margin-bottom: 10px;">
+                Notes for <span id="current-context">Loading...</span>
+            </div>
+            <div id="quill-editor"></div>
+            <button id="save-button">Save Changes</button>
+        </div>
+    </div>
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <script src="../src/all-notes.js"></script>
 </body>
 </html>

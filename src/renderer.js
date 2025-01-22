@@ -158,19 +158,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   })
-  // Handle hover behavior
-  lockButton.addEventListener('mouseover', () => {
-    if (isLocked) {
-      lockButton.dataset.originalText = lockButton.textContent // Store the original text
-      lockButton.textContent = 'Unlock'
-    }
-  })
+  
+  // Make Lock on {CurrentContext} button say Unlock on hover
 
-  lockButton.addEventListener('mouseout', () => {
-    if (isLocked && lockButton.dataset.originalText) {
-      lockButton.textContent = lockButton.dataset.originalText // Restore the original text
-    }
-  })
+  // lockButton.addEventListener('mouseover', () => {
+  //   if (isLocked) {
+  //     lockButton.dataset.originalText = lockButton.textContent // Store the original text
+  //     lockButton.textContent = 'Unlock'
+  //   }
+  // })
+
+  // lockButton.addEventListener('mouseout', () => {
+  //   if (isLocked && lockButton.dataset.originalText) {
+  //     lockButton.textContent = lockButton.dataset.originalText // Restore the original text
+  //   }
+  // })
 
   // Add refresh button functionality
   const refreshButton = document.getElementById('refresh-button');
@@ -188,6 +190,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error refreshing context:', error);
         }
     });
+
+  const alwaysOnTopButton = document.getElementById('always-on-top-button');
+    let isAlwaysOnTop = true; // Default state
+    alwaysOnTopButton.addEventListener('click', () => {
+      isAlwaysOnTop = !isAlwaysOnTop;
+      ipcRenderer.send('toggle-always-on-top', isAlwaysOnTop);
+      alwaysOnTopButton.textContent = `Always on Top: ${isAlwaysOnTop ? 'On' : 'Off'}`;
+  });
+
 
   // Load initial notes
   const initialContext = 'default'
