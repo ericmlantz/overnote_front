@@ -199,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
       alwaysOnTopButton.textContent = `Always on Top: ${isAlwaysOnTop ? 'On' : 'Off'}`;
   });
 
-
   // Load initial notes
   const initialContext = 'default'
   fetchNotes(initialContext)
