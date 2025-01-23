@@ -40,7 +40,6 @@ async function getCurrentContext() {
       return currentContext
     }
 
-    console.log('Fetched Context:', context)
     return context
   } catch (error) {
     console.error('Error in getCurrentContext:', error)
@@ -96,13 +95,13 @@ async function setupContextListeners() {
   let pollingInterval
 
   app.on('browser-window-focus', () => {
-    console.log('Browser window focus detected.')
+    // console.log('Browser window focus detected.')
     clearInterval(pollingInterval) // Stop polling when a window gains focus
     pollingInterval = setInterval(checkActiveApp, 500) // Poll for changes
   })
 
   app.on('browser-window-blur', () => {
-    console.log('Browser window lost focus.')
+    // console.log('Browser window lost focus.')
     clearInterval(pollingInterval)
     pollingInterval = setInterval(checkActiveApp, 500) // Start polling again
   })
@@ -148,7 +147,6 @@ function toggleNotesWindow() {
     if (!tray || !notesWindow) return;
 
     const trayBounds = tray.getBounds(); // Get the tray icon's bounds
-    console.log(trayBounds)
     const windowBounds = notesWindow.getBounds(); // Get the current notes window size
 
     // Calculate the position for the notes window

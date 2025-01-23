@@ -7,16 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let quill = null; // Quill instance
     let currentContext = null; // Currently selected context
-    let allContexts = [];
-
-    // Debounce function to limit API calls
-    const debounce = (func, delay) => {
-        let timer;
-        return (...args) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => func(...args), delay);
-        };
-    };
+    let allContexts = []; // Stores all contexts fetched from the backend
 
     // Initialize Quill
     const initializeQuill = () => {
@@ -31,22 +22,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             },
         });
 
-        // Add listener for content changes
+        // Add listener for text changes
         quill.on('text-change', debounce(async () => {
-            if (!currentContext) {
-                console.warn('No context selected. Skipping save.');
-                return;
+            if (currentContext) {
+                const htmlContent = quill.root.innerHTML.trim(); // Get the content
+                console.log(`Saving notes for context: ${currentContext.context}`);
+                await saveNotes(currentContext.context, htmlContent); // Save changes
+            } else {
+                console.warn('No context selected. Changes not saved.');
             }
+        }, 500)); // Debounce to limit excessive calls
+    };
 
-            const htmlContent = quill.root.innerHTML.trim(); // Get Quill's HTML content
-            console.log(`Auto-saving notes for context: ${currentContext.context}`);
-            await saveNotes(currentContext.context, htmlContent);
-        }, 500)); // Debounce time in milliseconds
+    // Debounce function
+    const debounce = (func, delay) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func(...args), delay);
+        };
     };
 
     // Save notes to the backend
     const saveNotes = async (context, content) => {
         try {
+            console.log(`Attempting to save notes for context: ${context}`);
             const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
                 method: 'PUT',
                 headers: {
@@ -82,6 +82,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // Fetch notes for a specific context
+    const fetchNotesForContext = async (contextName) => {
+        try {
+            console.log(`Fetching notes for context: ${contextName}`);
+            const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
+            }
+
+            const notes = await response.json();
+            console.log(`Fetched notes for context: ${contextName}`, notes);
+
+            // Populate the Quill editor with the fetched notes
+            const combinedNotes = notes.map((note) => note.content).join('<br>');
+            quill.clipboard.dangerouslyPasteHTML(combinedNotes);
+        } catch (error) {
+            console.error('Error fetching notes for context:', error);
+        }
+    };
+
     // Render the list of contexts
     const renderContextList = (contexts) => {
         contextList.innerHTML = ''; // Clear the list
@@ -96,37 +116,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             listItem.title = context.context;
 
             // Handle click to display notes
-            listItem.addEventListener('click', () => {
+            listItem.addEventListener('click', async () => {
+                if (currentContext) {
+                    const htmlContent = quill.root.innerHTML.trim();
+                    console.log(`Saving notes for context: ${currentContext.context}`);
+                    await saveNotes(currentContext.context, htmlContent); // Save the current notes
+                }
+
                 // Highlight the selected context
                 const selected = document.querySelector('.context-item.selected');
                 if (selected) selected.classList.remove('selected');
                 listItem.classList.add('selected');
 
-                // Display the notes for the selected context
-                displayNotes(context);
+                // Fetch and display the notes for the selected context
+                currentContext = context; // Update the current context
+                currentContextDisplay.textContent = context.context; // Update the header
+                await fetchNotesForContext(context.context);
             });
 
             contextList.appendChild(listItem);
         });
     };
 
-    // Display notes for a selected context in the Quill editor
-    const displayNotes = (context) => {
-        currentContext = context; // Set the current context
-        currentContextDisplay.textContent = context.context; // Update the header
-
-        quill.setContents([]); // Clear the editor
-
-        // Populate the Quill editor with the context's notes
-        if (context.notes.length > 0) {
-            const combinedNotes = context.notes.map((note) => note.content).join('<br>');
-            quill.clipboard.dangerouslyPasteHTML(combinedNotes);
-        } else {
-            quill.setText(''); // Clear the editor if no notes exist
-        }
-    };
-
-    // Initialize and fetch all notes on page load
+    // Initialize Quill and fetch all notes on page load
     initializeQuill();
-    fetchAllNotes();
+    await fetchAllNotes();
 });
