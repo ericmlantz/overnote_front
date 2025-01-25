@@ -195,7 +195,7 @@ function openAllNotesWindow() {
 
 // App ready event
 app.on('ready', () => {
-  const iconPath = path.join(__dirname, '../public', 'overnote_icon.png')
+  const iconPath = path.join(__dirname, '../public', 'white_map_scribble_overnote_logo.png')
   tray = new Tray(iconPath)
 
   // Set the tray's tooltip
