@@ -2,6 +2,17 @@ const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron')
 const path = require('path')
 const { getActiveAppContext } = require('./active-window') // Import context-fetching function
 
+const { systemPreferences } = require('electron');
+
+if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+  console.log('Requesting Accessibility permissions...');
+  systemPreferences.isTrustedAccessibilityClient(true); // Prompt for permissions
+}
+
+app.setName('Overnote');
+app.dock.setIcon(path.join(__dirname, '../public', 'icon.png'));
+
+
 let tray = null
 let notesWindow = null
 let currentContext = ''
@@ -115,6 +126,7 @@ async function setupContextListeners() {
 
 // Function to create the notes window
 function createNotesWindow() {
+  const iconPath = path.join(__dirname, '../public', 'icon.png'); // Update with your icon file path
   notesWindow = new BrowserWindow({
     width: 400,
     height: 400,
@@ -124,7 +136,8 @@ function createNotesWindow() {
       preload: path.join(__dirname, 'preload.js'), // Path to preload script
       contextIsolation: true, // Ensure secure context isolation
       nodeIntegration: false // Prevent direct Node.js access for security
-    }
+    },
+    icon: iconPath, // Add this line for the dock icon
   })
 
   console.log('Preload Path:', path.join(__dirname, 'preload.js')) // Debugging log
