@@ -1,17 +1,23 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron')
 const path = require('path')
-const { getActiveAppContext } = require('../active-window') // Import context-fetching function
+const { getActiveAppContext } = require('./active-window') // Import context-fetching function
 
-const { systemPreferences } = require('electron');
+const { systemPreferences } = require('electron')
 
 if (!systemPreferences.isTrustedAccessibilityClient(false)) {
-  console.log('Requesting Accessibility permissions...');
-  systemPreferences.isTrustedAccessibilityClient(true); // Prompt for permissions
+  console.log('Requesting Accessibility permissions...')
+  systemPreferences.isTrustedAccessibilityClient(true) // Prompt for permissions
 }
 
-app.setName('Overnote');
-app.dock.setIcon(path.join(__dirname, '../public', 'icon.png'));
+app.setName('Overnote')
 
+
+app.on('quit', () => {
+    console.log('Application is terminating...');
+    app.quit(); // Ensures the app terminates fully
+});
+
+app.dock.setIcon(path.join(__dirname, '../public', 'icon.png'))
 
 let tray = null
 let notesWindow = null
@@ -31,11 +37,11 @@ if (!ipcMain.eventNames().includes('get-current-context')) {
   })
 }
 ipcMain.on('toggle-always-on-top', (event, isAlwaysOnTop) => {
-    if (notesWindow) {
-        notesWindow.setAlwaysOnTop(isAlwaysOnTop);
-        console.log(`Always on Top set to: ${isAlwaysOnTop}`);
-    }
-});
+  if (notesWindow) {
+    notesWindow.setAlwaysOnTop(isAlwaysOnTop)
+    console.log(`Always on Top set to: ${isAlwaysOnTop}`)
+  }
+})
 
 // Function to get the current active window's context
 async function getCurrentContext() {
@@ -82,43 +88,53 @@ async function updateNotesWindowTitle(context) {
 // Function to set up listeners for focus changes
 async function setupContextListeners() {
   let previousContext = ''
+  let pollingInterval = null
 
-  // Poll for active app changes
-  const checkActiveApp = async () => {
-    const context = await getCurrentContext()
+  // Function to start polling for active app changes
+  const startPolling = () => {
+    if (pollingInterval) return // Prevent multiple polling intervals
+    console.log('Starting context polling...')
+    pollingInterval = setInterval(async () => {
+      const context = await getCurrentContext()
 
-    // Ignore the notes window when focused
-    if (context === 'Notes Window') {
-      console.log(
-        'Notes window is focused; keeping previous context:',
-        previousContext
-      )
-      return
-    }
+      // Ignore the notes window when focused
+      if (notesWindow && notesWindow.isFocused()) {
+        console.log(
+          'Notes window is focused; keeping previous context:',
+          previousContext
+        )
+        return
+      }
 
-    if (context !== previousContext) {
-      previousContext = context
-      console.log('Active app changed to:', context)
-      await updateNotesWindowTitle(context)
+      if (context !== previousContext) {
+        previousContext = context
+        console.log('Active app changed to:', context)
+        await updateNotesWindowTitle(context)
+      }
+    }, 500) // Poll every 500ms
+  }
+
+  // Function to stop polling for active app changes
+  const stopPolling = () => {
+    if (pollingInterval) {
+      console.log('Stopping context polling...')
+      clearInterval(pollingInterval)
+      pollingInterval = null
     }
   }
 
-  let pollingInterval
-
-  app.on('browser-window-focus', () => {
-    // console.log('Browser window focus detected.')
-    clearInterval(pollingInterval) // Stop polling when a window gains focus
-    pollingInterval = setInterval(checkActiveApp, 500) // Poll for changes
+  // Listen for notes window visibility changes
+  notesWindow.on('show', () => {
+    startPolling()
   })
 
-  app.on('browser-window-blur', () => {
-    // console.log('Browser window lost focus.')
-    clearInterval(pollingInterval)
-    pollingInterval = setInterval(checkActiveApp, 500) // Start polling again
+  notesWindow.on('hide', () => {
+    stopPolling()
   })
 
+  // Ensure polling stops when the app quits
   app.on('quit', () => {
-    clearInterval(pollingInterval) // Clean up on app quit
+    stopPolling()
   })
 
   console.log('Context listeners set up.')
@@ -126,9 +142,9 @@ async function setupContextListeners() {
 
 // Function to create the notes window
 function createNotesWindow() {
-  const iconPath = path.join(__dirname, '../public', 'icon.png'); // Update with your icon file path
+  const iconPath = path.join(__dirname, '../public', 'icon.png') // Update with your icon file path
   notesWindow = new BrowserWindow({
-    width: 400,
+    width: 472,
     height: 400,
     show: false,
     alwaysOnTop: true,
@@ -137,17 +153,24 @@ function createNotesWindow() {
       contextIsolation: true, // Ensure secure context isolation
       nodeIntegration: false // Prevent direct Node.js access for security
     },
-    icon: iconPath, // Add this line for the dock icon
+    icon: iconPath // Add this line for the dock icon
   })
 
-  console.log('Preload Path:', path.join(__dirname, 'preload.js')) // Debugging log
+  console.log('Preload Path:', path.join(__dirname, 'preload.js'))
 
   notesWindow.loadFile(path.join(__dirname, '../public/index.html'))
 
   notesWindow.on('close', (e) => {
-    e.preventDefault()
-    notesWindow.hide() // Prevent closing the window; just hide it
-  })
+    if (!app.isQuitting) {
+      console.log('Hiding notes window instead of quitting.');
+      e.preventDefault();
+      notesWindow.hide();
+    }
+  });
+
+  app.on('before-quit', () => {
+    app.isQuitting = true;
+  });
 
   // Ignore context updates when the notes window is focused
   notesWindow.on('focus', () => {
@@ -157,58 +180,72 @@ function createNotesWindow() {
 
 // Function to toggle the visibility of the notes window
 function toggleNotesWindow() {
-    if (!tray || !notesWindow) return;
+  if (!tray || !notesWindow) return
 
-    const trayBounds = tray.getBounds(); // Get the tray icon's bounds
-    const windowBounds = notesWindow.getBounds(); // Get the current notes window size
+  const trayBounds = tray.getBounds() // Get the tray icon's bounds
+  const windowBounds = notesWindow.getBounds() // Get the current notes window size
 
-    // Calculate the position for the notes window
-    const x = Math.round((trayBounds.x - windowBounds.width) + trayBounds.width); // Position to the left of the tray icon
-    const y = Math.round(trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2); // Center vertically with the tray icon
+  // Calculate the position for the notes window
+  const x = Math.round(trayBounds.x - windowBounds.width + trayBounds.width) // Position to the left of the tray icon
+  const y = Math.round(
+    trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2
+  ) // Center vertically with the tray icon
 
-    // Set the notes window position
-    notesWindow.setBounds({
-        x: x,
-        y: y,
-        width: windowBounds.width,
-        height: windowBounds.height,
-    });
+  // Set the notes window position
+  notesWindow.setBounds({
+    x: x,
+    y: y,
+    width: windowBounds.width,
+    height: windowBounds.height
+  })
 
-    if (notesWindow.isVisible()) {
-        notesWindow.hide();
-    } else {
-        notesWindow.show();
-        getCurrentContext().then((context) => updateNotesWindowTitle(context)); // Update the title with the current context
-    }
+  if (notesWindow.isVisible()) {
+    notesWindow.hide()
+  } else {
+    // Fetch the most recent active context dynamically
+    getCurrentContext()
+      .then((context) => {
+        console.log('Fetched context on menu bar click:', context) // Debug log
+        updateNotesWindowTitle(context) // Update the title with the fetched context
+        notesWindow.show()
+      })
+      .catch((error) => {
+        console.error('Error fetching context on menu bar click:', error)
+      })
+  }
 }
 
 function openAllNotesWindow() {
-    if (allNotesWindow) {
-        allNotesWindow.focus()
-        return
+  if (allNotesWindow) {
+    allNotesWindow.focus()
+    return
+  }
+
+  allNotesWindow = new BrowserWindow({
+    width: 1025,
+    height: 600,
+    show: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     }
+  })
 
-    allNotesWindow = new BrowserWindow({
-        width: 1025,
-        height: 600,
-        show: true,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-        },
-    })
+  allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'))
 
-    allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'))
-    
-    allNotesWindow.on('closed', () => {
-        allNotesWindow = null
-    })
+  allNotesWindow.on('closed', () => {
+    allNotesWindow = null
+  })
 }
 
 // App ready event
 app.on('ready', () => {
-  const iconPath = path.join(__dirname, '../public', 'white_map_scribble_overnote_logo.png')
+  const iconPath = path.join(
+    __dirname,
+    '../public',
+    'white_map_scribble_overnote_logo.png'
+  )
   tray = new Tray(iconPath)
 
   // Set the tray's tooltip
@@ -226,10 +263,14 @@ app.on('ready', () => {
         label: 'Open All Notes',
         click: () => openAllNotesWindow()
       },
-      { 
+      {
         label: 'Quit',
-        click: () => app.quit()
-       }
+        click: () => {
+            console.log('Quit selected from tray icon')
+            app.isQuitting = true
+            app.quit()
+        } 
+      }
     ])
     tray.popUpContextMenu(contextMenu)
   })
