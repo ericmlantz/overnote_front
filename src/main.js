@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron')
 const path = require('path')
-const { getActiveAppContext } = require('./active-window') // Import context-fetching function
+const { getActiveAppContext } = require('../active-window') // Import context-fetching function
 
 const { systemPreferences } = require('electron');
 

@@ -17,9 +17,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             theme: 'snow',
             modules: {
                 toolbar: [
-                    ['bold', 'italic', 'underline'],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    ['link'],
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    ['link', 'blockquote', 'code-block',],
+                    ['clean']
                 ],
             },
         });

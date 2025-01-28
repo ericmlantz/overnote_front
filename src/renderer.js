@@ -24,9 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
     placeholder: 'Write your notes here...',
     modules: {
       toolbar: [
-        ['bold', 'italic', 'underline'], // Formatting options
-        [{ list: 'ordered' }, { list: 'bullet' }], // Lists
-        ['link', 'image'] // Links and images
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['link', 'blockquote', 'code-block',],
+        ['clean']
       ]
     }
   })
