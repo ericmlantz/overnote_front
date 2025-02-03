@@ -35,62 +35,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch notes for a given context and set them in Quill
   const fetchNotes = async (context) => {
-    console.log(`Fetching notes for context: ${context}`)
+    console.log(`Fetching notes for context: ${context}`);
     try {
-      const response = await fetch(
-        `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
-      )
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.warn(`No notes found for context: ${context}`)
-          quill.setText('') // Clear the editor for empty contexts
-          editorDiv.dataset.context = context // Update the editor's context
-          return
+        const response = await fetch(
+            `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
+        );
+        if (!response.ok) {
+            if (response.status === 404) {
+                console.warn(`No notes found for context: ${context}`);
+                quill.setText(''); // Clear the editor
+                return; // Do NOT update dataset.context yet
+            }
+            throw new Error(`Failed to fetch notes: ${response.statusText}`);
         }
-        throw new Error(`Failed to fetch notes: ${response.statusText}`)
-      }
 
-      const notes = await response.json()
-      console.log('Fetched notes:', notes)
+        const notes = await response.json();
+        console.log('Fetched notes:', notes);
 
-      const combinedNotes = notes.map((note) => note.content).join('')
-      quill.root.innerHTML = combinedNotes // Update the Quill editor
-      editorDiv.dataset.context = context // Store the current context
+        const combinedNotes = notes.map((note) => note.content).join('');
+        quill.root.innerHTML = combinedNotes; // Update the Quill editor
+        editorDiv.dataset.context = context; // Store the current context only if notes exist
     } catch (error) {
-      console.error('Error fetching notes:', error)
-      quill.setText('') // Clear the editor on error
+        console.error('Error fetching notes:', error);
+        quill.setText(''); // Clear the editor on error
     }
-  }
+};
 
   // Save notes when there are changes in the editor
   const saveAllNotes = async (allContent) => {
     try {
-      const context = editorDiv.dataset.context // Get the current context
-      console.log('saveAllNotes called for context:', context)
-      if (!context) {
-        throw new Error('Context is missing. Unable to save notes.')
-      }
+        const context = editorDiv.dataset.context; // Get the current context
+        console.log('saveAllNotes called for context:', context);
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ notes: allContent, context }) // Send notes as an array
-      })
+        if (!context) {
+            throw new Error('Context is missing. Unable to save notes.');
+        }
 
-      if (!response.ok) {
-        throw new Error(`Failed to update notes: ${response.statusText}`)
-      }
-      console.log('Notes updated successfully for context:', context)
+        const htmlContent = allContent[0]?.trim();
+        const isEmpty = htmlContent === '' || htmlContent === '<p><br></p>';
+
+        if (isEmpty) {
+            console.log(`Note for context '${context}' is empty. Checking if context exists before deleting...`);
+
+            // First, check if the context exists in the database
+            const checkResponse = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`);
+            
+            if (checkResponse.status === 404) {
+                console.warn(`Context '${context}' not found in the database. Skipping delete.`);
+                return; // Exit early to prevent unnecessary DELETE request
+            } else if (!checkResponse.ok) {
+                throw new Error(`Failed to verify context existence: ${checkResponse.statusText}`);
+            }
+
+            const existingNotes = await checkResponse.json();
+            if (existingNotes.length === 0) {
+                console.warn(`Context '${context}' already empty in the database. Skipping delete.`);
+                return;
+            }
+
+            // If context exists and has no notes, proceed with deletion
+            console.log(`Deleting context '${context}' as its note is empty.`);
+            const deleteResponse = await fetch(`${BACKEND_BASE_URL}/api/context/delete`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context }) 
+            });
+
+            if (!deleteResponse.ok) {
+                throw new Error(`Failed to delete context: ${deleteResponse.statusText}`);
+            }
+
+            console.log(`Context '${context}' deleted successfully.`);
+            return;
+        }
+ 
+        // Otherwise, save the note normally
+        const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: allContent, context }) 
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to update notes: ${response.statusText}`);
+        }
+
+        console.log('Notes updated successfully for context:', context);
     } catch (error) {
-      console.error('Error updating notes:', error)
+        console.error('Error updating notes:', error);
     }
-  }
+};
 
   // Listen for changes in the editor and save notes
   quill.on('text-change', () => {
-    const content = quill.root.innerHTML // Get Quill content as HTML
+    const content = quill.root.innerHTML.trim() // Get Quill content as HTML
     saveAllNotes([content]) // Pass the content as an array
   })
 
@@ -177,21 +215,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // })
 
   // Add refresh button functionality
-  const refreshButton = document.getElementById('refresh-button');
-    refreshButton.addEventListener('click', async () => {
-        console.log('Refresh button clicked. Re-fetching the current context...');
-        try {
-            const currentContext = await ipcRenderer.invoke('get-current-context');
-            if (currentContext) {
-                console.log(`Refreshing notes for context: ${currentContext}`);
-                await fetchNotes(currentContext); // Update the notes for the refreshed context
-            } else {
-                console.error('No valid context found during refresh.');
-            }
-        } catch (error) {
-            console.error('Error refreshing context:', error);
+const refreshButton = document.getElementById('refresh-button');
+refreshButton.addEventListener('click', async () => {
+    console.log('Refresh button clicked. Re-fetching the last valid context...');
+
+    try {
+        const refreshedContext = await ipcRenderer.invoke('get-previous-context'); // Get previous context
+        if (refreshedContext && refreshedContext !== 'Notes Window') {
+            console.log(`Refreshing notes for previous valid context: ${refreshedContext}`);
+            await fetchNotes(refreshedContext); // Fetch notes for the last valid context
+        } else {
+            console.warn('No valid previous context available.');
         }
-    });
+    } catch (error) {
+        console.error('Error refreshing to previous context:', error);
+    }
+});
 
   const alwaysOnTopButton = document.getElementById('always-on-top-button');
     let isAlwaysOnTop = true; // Default state
