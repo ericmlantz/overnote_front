@@ -135,27 +135,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         .trim(); // Remove leading and trailing whitespace
     };
 
-const fetchNotesForContext = async (contextName) => {
-    try {
-        console.log(`Fetching notes for context: ${contextName}`);
-        const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
+    const fetchNotesForContext = async (contextName) => {
+        if (!contextName) {
+            console.error("❌ Context name is undefined.");
+            return;
         }
-
-        const notes = await response.json();
-        console.log(`Fetched notes for context: ${contextName}`, notes);
-
-        // Combine and normalize notes content
-        const combinedNotes = notes.map((note) => note.content).join('');
-        const normalizedContent = normalizeHtmlContent(combinedNotes);
-
-        // Populate the Quill editor with the cleaned-up content
-        quill.clipboard.dangerouslyPasteHTML(normalizedContent);
-    } catch (error) {
-        console.error('Error fetching notes for context:', error);
-    }
-};
+    
+        try {
+            console.log(`📥 Fetching notes for context: '${contextName}'`);
+            const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
+    
+            if (!response.ok) {
+                throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
+            }
+    
+            const notes = await response.json();
+            console.log(`🔎 Retrieved notes:`, notes);
+    
+            // ✅ Clear editor before updating to prevent duplication
+            quill.setText('');
+    
+            const combinedNotes = notes.map((note) => note.content).join('');
+            console.log("📝 Setting Quill editor content:", combinedNotes);
+            quill.clipboard.dangerouslyPasteHTML(combinedNotes);
+    
+        } catch (error) {
+            console.error("❌ Error fetching notes for context:", error);
+            quill.setContents([]); // Clear editor on error
+        }
+    };
  
     const renderContextList = (contexts) => {
         contextList.innerHTML = '';

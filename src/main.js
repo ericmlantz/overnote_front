@@ -24,6 +24,7 @@ let notesWindow = null
 let currentContext = ''
 let allNotesWindow = null
 
+
 // Prevent multiple registrations of the same IPC handler
 if (!ipcMain.eventNames().includes('get-current-context')) {
   ipcMain.handle('get-current-context', async () => {
@@ -142,27 +143,34 @@ async function setupContextListeners() {
 
 // Function to create the notes window
 function createNotesWindow() {
-  const iconPath = path.join(__dirname, '../public', 'icon.png') // Update with your icon file path
+  if (allNotesWindow && !allNotesWindow.isDestroyed()) {
+    allNotesWindow.close(); // Close All Notes window if open
+  }
+
+  if (notesWindow && !notesWindow.isDestroyed()) {
+    notesWindow.focus(); // Bring existing Notes window to the front
+    return;
+  }
+
+  const iconPath = path.join(__dirname, '../public', 'icon.png');
+
   notesWindow = new BrowserWindow({
     width: 472,
     height: 400,
     show: false,
     alwaysOnTop: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // Path to preload script
-      contextIsolation: true, // Ensure secure context isolation
-      nodeIntegration: false // Prevent direct Node.js access for security
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     },
-    icon: iconPath // Add this line for the dock icon
-  })
+    icon: iconPath
+  });
 
-  console.log('Preload Path:', path.join(__dirname, 'preload.js'))
-
-  notesWindow.loadFile(path.join(__dirname, '../public/index.html'))
+  notesWindow.loadFile(path.join(__dirname, '../public/index.html'));
 
   notesWindow.on('close', (e) => {
     if (!app.isQuitting) {
-      console.log('Hiding notes window instead of quitting.');
       e.preventDefault();
       notesWindow.hide();
     }
@@ -172,53 +180,60 @@ function createNotesWindow() {
     app.isQuitting = true;
   });
 
-  // Ignore context updates when the notes window is focused
   notesWindow.on('focus', () => {
-    console.log('Notes window focused, ignoring context update.')
-  })
+    console.log('Notes window focused, ignoring context update.');
+  });
 }
 
 // Function to toggle the visibility of the notes window
 function toggleNotesWindow() {
-  if (!tray || !notesWindow) return
+  if (!tray || !notesWindow) return;
 
-  const trayBounds = tray.getBounds() // Get the tray icon's bounds
-  const windowBounds = notesWindow.getBounds() // Get the current notes window size
+  // Close All Notes window if it's open
+  if (allNotesWindow && !allNotesWindow.isDestroyed()) {
+      allNotesWindow.close();
+      allNotesWindow = null;
+  }
+
+  const trayBounds = tray.getBounds(); // Get the tray icon's bounds
+  const windowBounds = notesWindow.getBounds(); // Get the current notes window size
 
   // Calculate the position for the notes window
-  const x = Math.round(trayBounds.x - windowBounds.width + trayBounds.width) // Position to the left of the tray icon
-  const y = Math.round(
-    trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2
-  ) // Center vertically with the tray icon
+  const x = Math.round(trayBounds.x - windowBounds.width + trayBounds.width);
+  const y = Math.round(trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2);
 
   // Set the notes window position
   notesWindow.setBounds({
-    x: x,
-    y: y,
-    width: windowBounds.width,
-    height: windowBounds.height
-  })
+      x: x,
+      y: y,
+      width: windowBounds.width,
+      height: windowBounds.height
+  });
 
   if (notesWindow.isVisible()) {
-    notesWindow.hide()
+      notesWindow.hide();
   } else {
-    // Fetch the most recent active context dynamically
-    getCurrentContext()
-      .then((context) => {
-        console.log('Fetched context on menu bar click:', context) // Debug log
-        updateNotesWindowTitle(context) // Update the title with the fetched context
-        notesWindow.show()
-      })
-      .catch((error) => {
-        console.error('Error fetching context on menu bar click:', error)
-      })
+      // Fetch the most recent active context dynamically
+      getCurrentContext()
+          .then((context) => {
+              console.log('Fetched context on menu bar click:', context);
+              updateNotesWindowTitle(context);
+              notesWindow.show();
+          })
+          .catch((error) => {
+              console.error('Error fetching context on menu bar click:', error);
+          });
   }
 }
 
 function openAllNotesWindow() {
-  if (allNotesWindow) {
-    allNotesWindow.focus()
-    return
+  if (notesWindow && !notesWindow.isDestroyed()) {
+    notesWindow.close(); // Close Notes window if open
+  }
+
+  if (allNotesWindow && !allNotesWindow.isDestroyed()) {
+    allNotesWindow.focus(); // Bring existing All Notes window to the front
+    return;
   }
 
   allNotesWindow = new BrowserWindow({
@@ -230,13 +245,15 @@ function openAllNotesWindow() {
       contextIsolation: true,
       nodeIntegration: false
     }
-  })
+  });
 
-  allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'))
+  allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'));
 
   allNotesWindow.on('closed', () => {
-    allNotesWindow = null
-  })
+    allNotesWindow = null;
+  });
+
+  return allNotesWindow;
 }
 
 // App ready event
