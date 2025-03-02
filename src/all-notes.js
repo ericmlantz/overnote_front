@@ -81,32 +81,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const saveNotes = async (context, content) => {
     try {
-      if (pendingDelete) {
-        console.log('Save aborted due to pending delete.');
-        return;
-      }
+        if (pendingDelete) {
+            console.log('Save aborted due to pending delete.');
+            return;
+        }
 
-      console.log(`Attempting to save notes for context: ${context}`);
-      const cleanedContent = normalizeHtmlContent(content);
+        console.log(`Attempting to save notes for context: ${context}`);
+        const cleanedContent = normalizeHtmlContent(content);
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/notes/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context,
-          notes: [cleanedContent], // Save the cleaned-up content
-        }),
-      });
+        const response = await fetch(`${BACKEND_BASE_URL}/api/notes/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                context,
+                notes: [cleanedContent], // Save only the cleaned-up content
+            }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to save notes: ${response.statusText}`);
-      }
+        if (!response.ok) {
+            throw new Error(`Failed to save notes: ${response.statusText}`);
+        }
 
-      console.log(`Notes saved successfully for context: ${context}`);
+        console.log(`✅ Notes saved successfully for context: ${context}`);
     } catch (error) {
-      console.error('Error saving notes:', error);
+        console.error('❌ Error saving notes:', error);
     }
-  };
+};
 
   const fetchAllNotes = async () => {
     try {
@@ -122,30 +122,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const fetchNotesForContext = async (contextName) => {
     if (!contextName) {
-      console.error('❌ Context name is undefined.');
-      return;
+        console.error('❌ Context name is undefined.');
+        return;
     }
 
     try {
-      console.log(`📥 Fetching notes for context: '${contextName}'`);
-      const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
+        console.log(`📥 Fetching notes for context: '${contextName}'`);
+        const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
-      }
+        if (!response.ok) {
+            throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
+        }
 
-      const notes = await response.json();
-      console.log(`🔎 Retrieved notes:`, notes);
+        let notes = await response.json();
+        console.log(`🔎 Retrieved notes:`, notes);
 
-      quill.setText('');
-      const combinedNotes = notes.map((note) => note.content).join('');
-      console.log('📝 Setting Quill editor content:', combinedNotes);
-      quill.clipboard.dangerouslyPasteHTML(combinedNotes);
+        quill.setText(''); // Clear editor before inserting
+
+        let combinedNotes = notes.map((note) => note.content).join('');
+
+        // Apply strict normalization before inserting
+        combinedNotes = normalizeHtmlContent(combinedNotes);
+
+        console.log('📝 Setting Quill editor content:', combinedNotes);
+        quill.root.innerHTML = combinedNotes; // Use innerHTML instead of dangerouslyPasteHTML
     } catch (error) {
-      console.error('❌ Error fetching notes for context:', error);
-      quill.setContents([]);
+        console.error('❌ Error fetching notes for context:', error);
+        quill.setContents([]);
     }
-  };
+};
 
   const fetchPageTitle = async (url) => {
     try {
@@ -158,9 +163,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  const normalizeHtmlContent = (htmlContent) => {
-    return htmlContent.replace(/<p><br><\/p>(\s*<p><br><\/p>)+/g, '<p><br></p>').trim();
-  };
+const normalizeHtmlContent = (htmlContent) => {
+    // Prevent auto-accumulation of empty paragraphs while preserving user-added ones
+    let cleanedContent = htmlContent.replace(/(<p><br><\/p>\s*){3,}/g, '<p><br></p>');
+
+    // Remove multiple <p><br></p> that appear directly before <pre>, allowing at most one
+    cleanedContent = cleanedContent.replace(/(<p><br><\/p>\s*)+(?=<pre>)/g, '<p><br></p>');
+
+    // Ensure at most one <p><br></p> follows a <pre> tag, but **do not add one automatically**
+    cleanedContent = cleanedContent.replace(/(?<=<\/pre>\s*)(<p><br><\/p>\s*)+/g, '<p><br></p>');
+
+    return cleanedContent.trim();
+};
 
   const renderContextList = async (contexts) => {
     contextList.innerHTML = '';
