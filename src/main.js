@@ -11,11 +11,10 @@ if (!systemPreferences.isTrustedAccessibilityClient(false)) {
 
 app.setName('Overnote')
 
-
 app.on('quit', () => {
-    console.log('Application is terminating...');
-    app.quit(); // Ensures the app terminates fully
-});
+  console.log('Application is terminating...')
+  app.quit() // Ensures the app terminates fully
+})
 
 app.dock.setIcon(path.join(__dirname, '../public', 'icon.png'))
 
@@ -23,7 +22,6 @@ let tray = null
 let notesWindow = null
 let currentContext = ''
 let allNotesWindow = null
-
 
 // Prevent multiple registrations of the same IPC handler
 if (!ipcMain.eventNames().includes('get-current-context')) {
@@ -144,15 +142,15 @@ async function setupContextListeners() {
 // Function to create the notes window
 function createNotesWindow() {
   if (allNotesWindow && !allNotesWindow.isDestroyed()) {
-    allNotesWindow.close(); // Close All Notes window if open
+    allNotesWindow.close() // Close All Notes window if open
   }
 
   if (notesWindow && !notesWindow.isDestroyed()) {
-    notesWindow.focus(); // Bring existing Notes window to the front
-    return;
+    notesWindow.focus() // Bring existing Notes window to the front
+    return
   }
 
-  const iconPath = path.join(__dirname, '../public', 'icon.png');
+  const iconPath = path.join(__dirname, '../public', 'icon.png')
 
   notesWindow = new BrowserWindow({
     width: 472,
@@ -165,92 +163,98 @@ function createNotesWindow() {
       nodeIntegration: false
     },
     icon: iconPath
-  });
+  })
 
-  notesWindow.loadFile(path.join(__dirname, '../public/index.html'));
+  notesWindow.loadFile(path.join(__dirname, '../public/index.html'))
 
   notesWindow.on('close', (e) => {
     if (!app.isQuitting) {
-      e.preventDefault();
-      notesWindow.hide();
+      e.preventDefault()
+      notesWindow.hide()
     }
-  });
+  })
 
   app.on('before-quit', () => {
-    app.isQuitting = true;
-  });
+    app.isQuitting = true
+  })
 
   notesWindow.on('focus', () => {
-    console.log('Notes window focused, ignoring context update.');
-  });
+    console.log('Notes window focused, ignoring context update.')
+  })
 }
 
 // Function to toggle the visibility of the notes window
 function toggleNotesWindow() {
-  if (!tray || !notesWindow) return;
+  if (!tray || !notesWindow) return
 
   // Close All Notes window if it's open
   if (allNotesWindow && !allNotesWindow.isDestroyed()) {
-      allNotesWindow.close();
-      allNotesWindow = null;
+    allNotesWindow.close()
+    allNotesWindow = null
   }
 
-  const trayBounds = tray.getBounds(); // Get the tray icon's bounds
-  const windowBounds = notesWindow.getBounds(); // Get the current notes window size
+  const trayBounds = tray.getBounds() // Get the tray icon's bounds
+  const windowBounds = notesWindow.getBounds() // Get the current notes window size
 
   // Calculate the position for the notes window
-  const x = Math.round(trayBounds.x - windowBounds.width + trayBounds.width);
-  const y = Math.round(trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2);
+  const x = Math.round(trayBounds.x - windowBounds.width + trayBounds.width)
+  const y = Math.round(
+    trayBounds.y + trayBounds.height / 2 - windowBounds.height / 2
+  )
 
   // Set the notes window position
   notesWindow.setBounds({
-      x: x,
-      y: y,
-      width: windowBounds.width,
-      height: windowBounds.height
-  });
+    x: x,
+    y: y,
+    width: windowBounds.width,
+    height: windowBounds.height
+  })
 
   if (notesWindow.isVisible()) {
-      notesWindow.hide();
+    notesWindow.hide()
   } else {
-      // Fetch the most recent active context dynamically
-      getCurrentContext()
-          .then((context) => {
-              console.log('Fetched context on menu bar click:', context);
-              updateNotesWindowTitle(context);
-              notesWindow.show();
-          })
-          .catch((error) => {
-              console.error('Error fetching context on menu bar click:', error);
-          });
+    // Fetch the most recent active context dynamically
+    getCurrentContext()
+      .then((context) => {
+        console.log('Fetched context on menu bar click:', context)
+        updateNotesWindowTitle(context)
+        notesWindow.show()
+      })
+      .catch((error) => {
+        console.error('Error fetching context on menu bar click:', error)
+      })
   }
 }
 
 function openAllNotesWindow() {
   if (notesWindow && !notesWindow.isDestroyed()) {
-    notesWindow.close(); // Close Notes window if open
+      notesWindow.close(); // Close Notes window if open
   }
 
   if (allNotesWindow && !allNotesWindow.isDestroyed()) {
-    allNotesWindow.focus(); // Bring existing All Notes window to the front
-    return;
+      allNotesWindow.focus(); // Bring existing All Notes window to the front
+      return;
   }
 
   allNotesWindow = new BrowserWindow({
-    width: 1025,
-    height: 600,
-    show: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
+      width: 1025,
+      height: 600,
+      show: true,
+      transparent: true,  // Makes background transparent
+      frame: false,       // Removes the default title bar
+      resizable: true,    // Allow resizing
+      movable: true,      // Allow moving the window
+      webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false
+      }
   });
 
   allNotesWindow.loadFile(path.join(__dirname, '../public/all-notes.html'));
 
   allNotesWindow.on('closed', () => {
-    allNotesWindow = null;
+      allNotesWindow = null;
   });
 
   return allNotesWindow;
@@ -283,10 +287,10 @@ app.on('ready', () => {
       {
         label: 'Quit',
         click: () => {
-            console.log('Quit selected from tray icon')
-            app.isQuitting = true
-            app.quit()
-        } 
+          console.log('Quit selected from tray icon')
+          app.isQuitting = true
+          app.quit()
+        }
       }
     ])
     tray.popUpContextMenu(contextMenu)
