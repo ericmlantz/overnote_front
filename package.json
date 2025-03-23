@@ -30,6 +30,7 @@
   "dependencies": {
     "active-win": "^8.2.1",
     "get-windows": "^9.2.0",
+    "node": "^20.19.0",
     "quill": "^2.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -38,6 +39,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.3.1",
     "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
     "vite": "^6.0.7"
   }
 }

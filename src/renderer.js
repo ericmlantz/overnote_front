@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const fetchNotes = async (context) => {
     console.log(`📥 Fetching notes for context: ${context}`);
     try {
+        // Clear editor and reset context before fetching
+        quill.setText('');
+        editorDiv.dataset.context = context;
+
         const response = await fetch(
             `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
         );
@@ -44,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!response.ok) {
             if (response.status === 404) {
                 console.warn(`⚠️ No notes found for context: ${context}`);
-                quill.setText(''); // Clear editor for empty contexts
                 return;
             }
             throw new Error(`Failed to fetch notes: ${response.statusText}`);
@@ -53,19 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const notes = await response.json();
         console.log("🔎 Fetched notes:", notes);
 
-        // ✅ Prevent duplication by clearing Quill content first
-        quill.setText('');
-
         // Convert notes to HTML and set content
         const combinedNotes = notes.map((note) => note.content).join('');
         console.log("📝 Updating Quill editor with content:", combinedNotes);
         quill.root.innerHTML = combinedNotes;
-        editorDiv.dataset.context = context; // Store current context
+        lastValidContext = context; // Update last valid context
     } catch (error) {
         console.error("❌ Error fetching notes:", error);
-        quill.setText(''); // Clear editor on error
     }
-};
+  };
 
   // Save notes when there are changes in the editor
   const saveAllNotes = async (allContent) => {
@@ -138,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (context && context !== 'Error retrieving context') {
       await fetchNotes(context) // Fetch notes for the new context
-      lastValidContext = context // Update the last valid context
     } else if (lastValidContext) {
       console.warn(
         'Current context unavailable. Falling back to last valid context.'
@@ -168,13 +166,21 @@ document.addEventListener('DOMContentLoaded', () => {
       lockButton.textContent = 'Lock'
       console.log('Notes unlocked. Resuming dynamic updates.')
 
-      // Immediately fetch notes for the current active context
-      const currentContext = await ipcRenderer.invoke('get-current-context')
-      console.log(
-        `Fetching notes for current context after unlocking: ${currentContext}`
-      )
-      if (currentContext) {
-        await fetchNotes(currentContext) // Refresh notes for the current context
+      try {
+        // Clear the editor and fetch the current active context after unlocking
+        quill.setText('');
+        const currentContext = await ipcRenderer.invoke('get-current-context');
+        console.log(`Fetching notes for current context after unlocking: ${currentContext}`);
+
+        if (currentContext) {
+          await fetchNotes(currentContext); // Refresh notes for the current context
+          lastValidContext = currentContext; // Update the last valid context
+        } else {
+          console.warn('No valid context available after unlocking.');
+          quill.setText(''); // Clear notes if no valid context exists
+        }
+      } catch (error) {
+        console.error('Error updating context after unlocking:', error);
       }
     }
   })
@@ -194,23 +200,22 @@ document.addEventListener('DOMContentLoaded', () => {
   //   }
   // })
 
-  // Add refresh button functionality
-const refreshButton = document.getElementById('refresh-button');
-refreshButton.addEventListener('click', async () => {
-    console.log('Refresh button clicked. Re-fetching the last valid context...');
-
-    try {
-        const refreshedContext = await ipcRenderer.invoke('get-previous-context'); // Get previous context
-        if (refreshedContext && refreshedContext !== 'Notes Window') {
-            console.log(`Refreshing notes for previous valid context: ${refreshedContext}`);
-            await fetchNotes(refreshedContext); // Fetch notes for the last valid context
-        } else {
-            console.warn('No valid previous context available.');
-        }
-    } catch (error) {
-        console.error('Error refreshing to previous context:', error);
-    }
-});
+  // Remove refresh button functionality
+  // const refreshButton = document.getElementById('refresh-button');
+  // refreshButton.addEventListener('click', async () => {
+  //     console.log('Refresh button clicked. Re-fetching the last valid context...');
+  //     try {
+  //         const refreshedContext = await ipcRenderer.invoke('get-previous-context');
+  //         if (refreshedContext && refreshedContext !== 'Notes Window') {
+  //             console.log(`Refreshing notes for previous valid context: ${refreshedContext}`);
+  //             await fetchNotes(refreshedContext);
+  //         } else {
+  //             console.warn('No valid previous context available.');
+  //         }
+  //     } catch (error) {
+  //         console.error('Error refreshing to previous context:', error);
+  //     }
+  // });
 
   const alwaysOnTopButton = document.getElementById('always-on-top-button');
     let isAlwaysOnTop = true; // Default state
