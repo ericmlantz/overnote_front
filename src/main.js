@@ -94,21 +94,25 @@ async function setupContextListeners() {
     if (pollingInterval) return // Prevent multiple polling intervals
     console.log('Starting context polling...')
     pollingInterval = setInterval(async () => {
-      const context = await getCurrentContext()
+      try {
+        const context = await getCurrentContext()
 
-      // Ignore the notes window when focused
-      if (notesWindow && notesWindow.isFocused()) {
-        console.log(
-          'Notes window is focused; keeping previous context:',
-          previousContext
-        )
-        return
-      }
+        // Ignore the notes window when focused
+        if (notesWindow && notesWindow.isFocused()) {
+          console.log(
+            'Notes window is focused; keeping previous context:',
+            previousContext
+          )
+          return
+        }
 
-      if (context !== previousContext) {
-        previousContext = context
-        console.log('Active app changed to:', context)
-        await updateNotesWindowTitle(context)
+        if (context !== previousContext) {
+          previousContext = context
+          console.log('Active app changed to:', context)
+          await updateNotesWindowTitle(context)
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch context during polling:', error.message)
       }
     }, 500) // Poll every 500ms
   }

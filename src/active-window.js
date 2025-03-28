@@ -190,7 +190,7 @@ if (searchQuery) {
   } catch (error) {
     console.error('❌ Error fetching active window context:', error.message);
     console.error('🔧 Ensure the "active-win" package is installed and has the necessary permissions.');
-    return lastActiveContext; // Return the last known context as a fallback
+    return lastActiveContext || 'Fallback Context'; // Return the last known context as a fallback
   }
 }
 
