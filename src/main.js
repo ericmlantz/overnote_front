@@ -49,10 +49,10 @@ async function getCurrentContext() {
 
     // If the notes window is focused, return the last known context
     if (notesWindow && notesWindow.isFocused()) {
-      console.log(
-        'Notes window is focused. Returning previous context:',
-        currentContext
-      )
+      // console.log(
+      //   'Notes window is focused. Returning previous context:',
+      //   currentContext
+      // )
       return currentContext
     }
 
@@ -99,10 +99,10 @@ async function setupContextListeners() {
 
         // Ignore the notes window when focused
         if (notesWindow && notesWindow.isFocused()) {
-          console.log(
-            'Notes window is focused; keeping previous context:',
-            previousContext
-          )
+          // console.log(
+          //   'Notes window is focused; keeping previous context:',
+          //   previousContext
+          // )
           return
         }
 

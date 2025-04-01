@@ -6,9 +6,12 @@ let isLocked = false
 let lastLockedContext = null
 let lastValidContext = null
 const ignoredTitles = ['History', 'Downloads', 'Settings', 'New Tab']
+const notesMap = new Map(); // Assuming notesMap is defined somewhere
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('Renderer process loaded.')
+
+  let isProgrammaticChange = false; // New variable to guard against programmatic updates
 
   // const notesContainer = document.getElementById('notes-container');
   const quillEditor = document.getElementById('quill-editor')
@@ -35,8 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch notes for a given context and set them in Quill
   const fetchNotes = async (context) => {
-    console.log(`📥 Fetching notes for context: ${context}`);
+    // console.log(`📤 Fetching notes for context: ${context}`);
     try {
+        isProgrammaticChange = true; // Set the flag for programmatic change
         // Clear editor and reset context before fetching
         quill.setText('');
         editorDiv.dataset.context = context;
@@ -60,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const combinedNotes = notes.map((note) => note.content).join('');
         console.log("📝 Updating Quill editor with content:", combinedNotes);
         quill.root.innerHTML = combinedNotes;
+        setTimeout(() => { isProgrammaticChange = false; }, 200); // Reset the flag after the update
         lastValidContext = context; // Update last valid context
     } catch (error) {
         console.error("❌ Error fetching notes:", error);
@@ -77,14 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const htmlContent = allContent[0]?.trim();
-        console.log(`📤 Attempting to send notes to backend:`, htmlContent);
-
-        const isEmpty = htmlContent === '' || htmlContent === '<p><br></p>';
-        if (isEmpty) {
-            console.log(`⚠️ Note for context '${context}' is empty. Skipping save.`);
-            return;
-        }
-
         const requestData = JSON.stringify({ notes: [htmlContent], context });
         console.log(`🚀 Sending payload to backend:\n`, requestData);
 
@@ -105,15 +102,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 };
 
+  const maybeDeleteContext = async (context) => {
+      const content = quill.root.innerHTML.trim();
+      const isEmpty = !content || ['<p><br></p>', '<p><br/></p>', '<p></p>'].includes(content);
+
+      if (isEmpty) {
+          console.log(`🗑 maybeDeleteContext: '${context}' is empty. Deleting...`);
+          await fetch(`${BACKEND_BASE_URL}/api/notes/delete-context/`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ context }),
+          });
+          notesMap.delete(context);
+      }
+  };
+
   // Listen for changes in the editor and save notes
+  let saveTimeout; // Debounce timeout
   quill.on('text-change', () => {
-    const content = quill.root.innerHTML.trim() // Get Quill content as HTML
-    saveAllNotes([content]) // Pass the content as an array
-  })
+    if (isProgrammaticChange) return; // Guard against programmatic changes
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      const content = quill.root.innerHTML.trim();
+      saveAllNotes([content]);
+    }, 500); // Debounce time of 500ms
+  });
 
   // Handle context updates from the main process
   ipcRenderer.on('update-context', async (event, context) => {
     console.log(`Context updated to: ${context}`)
+
+    await maybeDeleteContext(editorDiv.dataset.context);
 
     if (isLocked) {
       console.log(
@@ -226,6 +245,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Load initial notes
-  const initialContext = 'default'
-  fetchNotes(initialContext)
+  try {
+    const initialContext = await ipcRenderer.invoke('get-current-context');
+    if (initialContext) {
+      await fetchNotes(initialContext);
+      lastValidContext = initialContext;
+    } else {
+      console.warn('No valid context available on load.');
+    }
+  } catch (error) {
+    console.error('❌ Failed to fetch initial context on load:', error);
+  }
+
+  window.addEventListener('beforeunload', async () => {
+      const context = editorDiv.dataset.context;
+      if (context) {
+          await maybeDeleteContext(context);
+      }
+  });
 })
