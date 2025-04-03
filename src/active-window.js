@@ -1,216 +1,159 @@
-let activeWin; // Declare activeWin variable
+import { activeWindow } from 'get-windows';
 
-let lastActiveContext = 'Unknown Context'; // Cache for last successful context
+/**
+ * Detects and formats the active window's context (e.g., website, app, document, or search term).
+ * This is used by Overnote to determine where annotations should be attached.
+ */
 
+let lastActiveContext = 'Unknown Context'; // Cache for last known good context
+
+/**
+ * Retrieves and formats the currently active window's context.
+ * This could be a browser search, app name, document name, or fallback context.
+ */
 async function getActiveAppContext() {
   try {
+    const { activeWindow } = await import('get-windows');
+    const activeWin = await activeWindow();
     if (!activeWin) {
-      activeWin = (await import('active-win')).default; // Dynamically import active-win
-    }
-
-    const activeWindow = await activeWin();
-    if (!activeWindow) {
       console.warn('⚠️ No active window detected. Returning last known context.');
       return lastActiveContext;
     }
 
-    const { title, url, owner } = activeWindow;
+    const { title, url, owner } = activeWin;
 
-    // Ignore the Electron app itself (Overnote app)
-    if (owner && owner.name === 'Electron') {
-      return 'Notes Window';
-    }
+    // ========================
+    // ⛔ Ignore the Overnote app itself
+    // ========================
+    if (owner && owner.name === 'Electron') return 'Notes Window';
 
-    // Handle Messages app specifically
-    if (owner && owner.name === 'Messages') {
-      lastActiveContext = title; // Use the name of the person being messaged as the context
+    // ========================
+    // 📱 Special handling for Messages app
+    // ========================
+    if (owner?.name === 'Messages') {
+      lastActiveContext = title;
       return lastActiveContext;
     }
 
-    // Extract the site name from the URL
+    // ========================
+    // 🌐 Search-based Sites
+    // ========================
     let siteName = url
       ? new URL(url).hostname.replace('www.', '').split('.')[0]
       : 'Unknown';
 
-    // Check if the title suggests a search query format
     let searchQuery = '';
 
-    // 🔍 Google Search
-    if (
-      url?.includes('google.com/search') ||
-      url?.includes('google.com/webhp')
-    ) {
+    if (url?.includes('google.com/search') || url?.includes('google.com/webhp')) {
       const match = title.match(/(.*?) - Google Search$/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 Wikipedia Search
-    else if (
-      url?.includes('wikipedia.org') &&
-      title.includes('Search results')
-    ) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('wikipedia.org') && title.includes('Search results')) {
       const match = title.match(/Search results for (.*?) - Wikipedia/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 YouTube Search
-    else if (url?.includes('youtube.com/results')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('youtube.com/results')) {
       const match = title.match(/"(.*?)" - YouTube/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 DuckDuckGo Search
-    else if (url?.includes('duckduckgo.com/')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('duckduckgo.com/')) {
       const match = title.match(/(.*?) at DuckDuckGo/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 Bing Search
-    else if (url?.includes('bing.com/search')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('bing.com/search')) {
       const match = title.match(/(.*?) - Bing/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 Yahoo Search
-    else if (url?.includes('search.yahoo.com')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('search.yahoo.com')) {
       const match = title.match(/(.*?) - Yahoo Search/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 Amazon Search
-    else if (url?.includes('amazon.com/s')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('amazon.com/s')) {
       const match = title.match(/Amazon.com : (.*?)/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 eBay Search
-    else if (url?.includes('ebay.com/sch/')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('ebay.com/sch/')) {
       const match = title.match(/(.*?) | eBay/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 LinkedIn Search
-    else if (url?.includes('linkedin.com/search/results')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (url?.includes('linkedin.com/search/results')) {
       const match = title.match(/(.*?) \| LinkedIn/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
-    }
-
-    // 🔍 Generic case for other search-based sites
-    else if (title.toLowerCase().includes('search')) {
+      if (match?.[1]) searchQuery = match[1].trim();
+    } else if (title.toLowerCase().includes('search')) {
       const match = title.match(/(.*?) - (.*)/);
-      if (match && match[1]) {
-        searchQuery = match[1].trim();
-      }
+      if (match?.[1]) searchQuery = match[1].trim();
     }
 
-    // Handle Google Chrome specifically
-    if (owner && owner.name === 'Google Chrome') {
-      if (url) {
-        // Use the URL as the context unless a predefined site is detected
-        lastActiveContext = predefinedSiteContext(url, title) || url;
-        return lastActiveContext;
-      }
+    // ========================
+    // 🌐 Chrome-specific fallback
+    // ========================
+    if (owner?.name === 'Google Chrome' && url) {
+      lastActiveContext = predefinedSiteContext(url, title) || url;
+      return lastActiveContext;
     }
 
-    // 🗂 Detect if the active window is a document/file-based application
-    if (!searchQuery && title && owner && owner.name) {
-      const fileBasedApps = [
-        { app: 'Microsoft Word', format: 'Word' },
-        { app: 'Preview', format: 'Preview' },
-        { app: 'Adobe Acrobat', format: 'Acrobat' },
-        { app: 'Google Docs', format: 'Google Docs' },
-        { app: 'Notepad', format: 'Notepad' },
-        { app: 'Sublime Text', format: 'Sublime' },
-        { app: 'Visual Studio Code', format: 'VS Code' },
-        { app: 'Pages', format: 'Pages' },
-        { app: 'TextEdit', format: 'TextEdit' }
-      ];
+    // ========================
+    // 📄 Detect file-based app contexts
+    // ========================
+    const fileBasedApps = [
+      { app: 'Microsoft Word', format: 'Word' },
+      { app: 'Preview', format: 'Preview' },
+      { app: 'Adobe Acrobat', format: 'Acrobat' },
+      { app: 'Google Docs', format: 'Google Docs' },
+      { app: 'Notepad', format: 'Notepad' },
+      { app: 'Sublime Text', format: 'Sublime' },
+      { app: 'Visual Studio Code', format: 'VS Code' },
+      { app: 'Pages', format: 'Pages' },
+      { app: 'TextEdit', format: 'TextEdit' }
+    ];
 
-      const matchedApp = fileBasedApps.find((app) =>
-        owner.name.includes(app.app)
-      );
+    const matchedApp = fileBasedApps.find(app => owner?.name.includes(app.app));
 
-      if (matchedApp) {
-        // Extract document name by removing file extension if present
-        const documentName = title.replace(/\.[^/.]+$/, '').trim();
-        lastActiveContext = `${documentName} | ${matchedApp.format}`;
-        return lastActiveContext;
-      }
+    if (matchedApp && title) {
+      const documentName = title.replace(/\.[^/.]+$/, '').trim(); // Remove file extension
+      lastActiveContext = `${documentName} | ${matchedApp.format}`;
+      return lastActiveContext;
     }
 
-// 📌 Final Formatting:
-if (searchQuery) {
-    // Search query detected: Format as "Search Term | Site Name"
-    lastActiveContext = `${searchQuery} | ${capitalize(siteName)}`;
-} else if (title && owner && owner.name) {
-    // 🖥 Detect VS Code: Format as "FileName | VSCode"
-    if (owner.name.includes('Code')) {
-        // Extract file name (before the first " - " separator)
+    // ========================
+    // 🧠 Final fallback formatting
+    // ========================
+    if (searchQuery) {
+      lastActiveContext = `${searchQuery} | ${capitalize(siteName)}`;
+    } else if (title && owner?.name) {
+      if (owner.name.includes('Code')) {
         let fileName = title.split(' - ')[0].trim();
-
-        // Ensure the extracted name is not the workspace/project name
         if (!fileName.includes('.') || fileName.toLowerCase().includes('workspace')) {
-            fileName = "Untitled"; // Default for unsaved/new files
+          fileName = 'Untitled';
         }
-
         lastActiveContext = `${fileName} | VSCode`;
+      } else if (owner.name.toLowerCase().includes('chatgpt')) {
+        lastActiveContext = 'ChatGPT';
+      } else {
+        lastActiveContext = owner.name === 'Code' ? 'VSCode' : owner.name;
+      }
+    } else {
+      lastActiveContext = title || url || 'Unknown Context';
     }
-    // 🖥 Handle ChatGPT or other Electron-based apps safely
-    else if (owner.name.toLowerCase().includes('chatgpt')) {
-        lastActiveContext = "ChatGPT";
-    }
-    // 🖥 Regular applications: Use "App Name"
-    else {
-        lastActiveContext = owner.name === "Code" ? "VSCode" : owner.name; // Rename "Code" to "VSCode"
-    }
-} else {
-    // 🌐 Websites that aren't search results: Use the page title or URL
-    lastActiveContext = title || url || 'Unknown Context';
-}
 
     return lastActiveContext;
   } catch (error) {
     console.error('❌ Error fetching active window context:', error.message);
-    console.error('🔧 Ensure the "active-win" package is installed and has the necessary permissions.');
-    return lastActiveContext || 'Fallback Context'; // Return the last known context as a fallback
+    console.error('🔧 Ensure the "get-windows" package is installed and has the necessary permissions.');
+    return lastActiveContext || 'Fallback Context';
   }
 }
 
-// Helper function to check for predefined site-specific contexts
+/**
+ * Detects predefined site-specific context format overrides.
+ * Used primarily for sites like Google Search or YouTube.
+ */
 function predefinedSiteContext(url, title) {
-  // Example predefined site logic
   if (url.includes('google.com/search')) {
     const match = title.match(/(.*?) - Google Search$/);
-    return match && match[1] ? `${match[1]} | Google Search` : null;
+    return match?.[1] ? `${match[1]} | Google Search` : null;
   }
-  if (url.includes('youtube.com')) {
-    return 'YouTube';
-  }
-  // Add more predefined site logic as needed
+  if (url.includes('youtube.com')) return 'YouTube';
   return null;
 }
 
-// Utility function to capitalize the site name
+/**
+ * Capitalizes the first letter of a given string.
+ */
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-module.exports = { getActiveAppContext };
+export { getActiveAppContext };
