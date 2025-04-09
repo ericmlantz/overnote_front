@@ -10,11 +10,39 @@ const notesMap = new Map(); // Assuming notesMap is defined somewhere
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Renderer process loaded.')
+  console.log('🟢 Polling started: Notes window opened.');
 
   let isProgrammaticChange = false; // New variable to guard against programmatic updates
 
   // const notesContainer = document.getElementById('notes-container');
   const quillEditor = document.getElementById('quill-editor')
+  
+  // Create loading spinner
+  const spinner = document.createElement('div');
+  spinner.id = 'loading-spinner';
+  spinner.style.position = 'absolute';
+  spinner.style.top = '50%';
+  spinner.style.left = '50%';
+  spinner.style.transform = 'translate(-50%, -50%)';
+  spinner.style.border = '6px solid #f3f3f3';
+  spinner.style.borderTop = '6px solid #3498db';
+  spinner.style.borderRadius = '50%';
+  spinner.style.width = '40px';
+  spinner.style.height = '40px';
+  spinner.style.animation = 'spin 1s linear infinite';
+  spinner.style.display = 'none';
+  spinner.style.zIndex = '10000';
+  document.body.appendChild(spinner);
+  
+  // Add keyframes for spinner animation
+  const style = document.createElement('style');
+  style.textContent = `
+  @keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+  `;
+  document.head.appendChild(style);
 
   // Create a div for the Quill editor
   const editorDiv = document.createElement('div')
@@ -38,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Fetch notes for a given context and set them in Quill
   const fetchNotes = async (context) => {
-    // console.log(`📤 Fetching notes for context: ${context}`);
+    spinner.style.display = 'block';
     try {
         isProgrammaticChange = true; // Set the flag for programmatic change
         // Clear editor and reset context before fetching
@@ -52,6 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!response.ok) {
             if (response.status === 404) {
                 console.warn(`⚠️ No notes found for context: ${context}`);
+                spinner.style.display = 'none';
                 return;
             }
             throw new Error(`Failed to fetch notes: ${response.statusText}`);
@@ -66,8 +95,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         quill.root.innerHTML = combinedNotes;
         setTimeout(() => { isProgrammaticChange = false; }, 200); // Reset the flag after the update
         lastValidContext = context; // Update last valid context
+        spinner.style.display = 'none';
     } catch (error) {
         console.error("❌ Error fetching notes:", error);
+        spinner.style.display = 'none';
     }
   };
 
@@ -262,5 +293,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (context) {
           await maybeDeleteContext(context);
       }
+      console.log('⏸️ Polling paused: Notes window closed.');
   });
 })

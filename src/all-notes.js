@@ -1,228 +1,150 @@
 const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
-const MAX_CONTEXT_LENGTH = 50; // Maximum character length before replacing with title
-
-let pendingDelete = false; // Flag to prevent saving immediately after deletion
-let quill = null;
-let currentContext = null;
-let allContexts = [];
+let quillInstances = {};
+let contextList = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const contextList = document.getElementById('contexts');
-  const quillEditorContainer = document.getElementById('quill-editor');
-  const currentContextDisplay = document.getElementById('current-context');
+  const container = document.getElementById('contexts');
+  contextList = await fetchAllNotes();
 
-  // Initialize Quill
-  const initializeQuill = () => {
-    quill = new Quill(quillEditorContainer, {
-      theme: 'snow',
-      modules: {
-        toolbar: [
-          [{ header: [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['link', 'blockquote', 'code-block'],
-          ['clean'],
-        ],
-      },
+  renderContexts(container, contextList);
+});
+
+// Fetch all notes
+async function fetchAllNotes() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/all-notes`);
+    if (!response.ok) throw new Error('Failed to fetch all notes');
+    return await response.json();
+  } catch (error) {
+    console.error('❌ Error fetching all notes:', error);
+    return [];
+  }
+}
+
+// Save note for a context
+async function saveNotes(context, htmlContent) {
+  try {
+    const cleanedContent = htmlContent.trim();
+
+    if (cleanedContent === '' || ['<p><br></p>', '<p><br/></p>', '<p></p>'].includes(cleanedContent)) {
+      console.log(`🗑 Deleting empty note for context: ${context}`);
+      await fetch(`${BACKEND_BASE_URL}/api/notes/delete-context/`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context }),
+      });
+      removeContextCard(context);
+      return;
+    }
+
+    const requestData = JSON.stringify({ notes: [cleanedContent], context });
+
+    const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: requestData,
     });
 
-    // Add listener for text changes
-    quill.on(
-      'text-change',
-      debounce(async () => {
-        if (pendingDelete) {
-          console.log('Skipping save due to pending delete.');
-          return;
-        }
-
-        if (currentContext) {
-          const htmlContent = quill.root.innerHTML.trim();
-
-          console.log(`Saving notes for context: ${currentContext.context}`);
-          await saveNotes(currentContext.context, htmlContent);
-
-          // If the note is empty or placeholder, delete the context and refresh the context list
-          if (htmlContent === '' || htmlContent === '<p><br></p>') {
-            console.log(`Note for context '${currentContext.context}' is empty. Deleting context...`);
-            pendingDelete = true;
-
-            try {
-              const response = await fetch(`${BACKEND_BASE_URL}/api/context/delete`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ context: currentContext.context }),
-              });
-
-              if (!response.ok) throw new Error(`Failed to delete context: ${response.statusText}`);
-
-              console.log(`Context '${currentContext.context}' deleted successfully.`);
-              currentContext = null;
-            } catch (error) {
-              console.error(`Error deleting context '${currentContext.context}':`, error);
-            }
-
-            await fetchAllNotes();
-            pendingDelete = false;
-          }
-        } else {
-          console.warn('No context selected. Changes not saved.');
-        }
-      }, 500)
-    );
-  };
-
-  const debounce = (func, delay) => {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), delay);
-    };
-  };
-
-  const saveNotes = async (context, content) => {
-    try {
-        if (pendingDelete) {
-            console.log('Save aborted due to pending delete.');
-            return;
-        }
-
-        console.log(`Attempting to save notes for context: ${context}`);
-        const cleanedContent = normalizeHtmlContent(content);
-
-        const response = await fetch(`${BACKEND_BASE_URL}/api/notes/save`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                context,
-                notes: [cleanedContent], // Save only the cleaned-up content
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to save notes: ${response.statusText}`);
-        }
-
-        console.log(`✅ Notes saved successfully for context: ${context}`);
-    } catch (error) {
-        console.error('❌ Error saving notes:', error);
-    }
-};
-
-  const fetchAllNotes = async () => {
-    try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/all-notes`);
-      if (!response.ok) throw new Error(`Failed to fetch all notes: ${response.statusText}`);
-
-      allContexts = await response.json();
-      await renderContextList(allContexts);
-    } catch (error) {
-      console.error('Error fetching all notes:', error);
-    }
-  };
-
-  const fetchNotesForContext = async (contextName) => {
-    if (!contextName) {
-        console.error('❌ Context name is undefined.');
-        return;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update notes: ${errorText}`);
     }
 
-    try {
-        console.log(`📥 Fetching notes for context: '${contextName}'`);
-        const response = await fetch(`${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(contextName)}`);
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch notes for context: ${response.statusText}`);
-        }
-
-        let notes = await response.json();
-        console.log(`🔎 Retrieved notes:`, notes);
-
-        quill.setText(''); // Clear editor before inserting
-
-        let combinedNotes = notes.map((note) => note.content).join('');
-
-        // Apply strict normalization before inserting
-        combinedNotes = normalizeHtmlContent(combinedNotes);
-
-        console.log('📝 Setting Quill editor content:', combinedNotes);
-        quill.root.innerHTML = combinedNotes; // Use innerHTML instead of dangerouslyPasteHTML
-    } catch (error) {
-        console.error('❌ Error fetching notes for context:', error);
-        quill.setContents([]);
+    console.log(`✅ Notes saved successfully for context: ${context}`);
+    // Update the in-memory contextList so we don't re-render stale notes
+    const updatedContext = contextList.find(c => c.context === context);
+    if (updatedContext) {
+      updatedContext.notes = [{ content: htmlContent }];
     }
-};
+  } catch (error) {
+    console.error("❌ Error saving notes:", error);
+  }
+}
 
-  const fetchPageTitle = async (url) => {
-    try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/get-page-title?context=${encodeURIComponent(url)}`);
-      const data = await response.json();
-      return data.title || url;
-    } catch (error) {
-      console.error(`Error fetching title for ${url}:`, error);
-      return url;
+function renderContexts(container, contexts) {
+  container.innerHTML = '';
+
+  const editorElement = document.getElementById('quill-editor');
+  const contextLabel = document.getElementById('current-context');
+
+  const quill = new Quill(editorElement, {
+    theme: 'snow',
+    placeholder: 'Select a context to view notes...',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'blockquote', 'code-block'],
+        ['clean']
+      ]
     }
-  };
+  });
 
-const normalizeHtmlContent = (htmlContent) => {
-    // Prevent auto-accumulation of empty paragraphs while preserving user-added ones
-    let cleanedContent = htmlContent.replace(/(<p><br><\/p>\s*){3,}/g, '<p><br></p>');
+  let currentContext = '';
+  let saveTimeout;
 
-    // Remove multiple <p><br></p> that appear directly before <pre>, allowing at most one
-    cleanedContent = cleanedContent.replace(/(<p><br><\/p>\s*)+(?=<pre>)/g, '<p><br></p>');
+  contexts.forEach((contextObj) => {
+    const li = document.createElement('li');
+    li.classList.add('context-item');
+    li.textContent = contextObj.context;
+    li.dataset.context = contextObj.context;
 
-    // Ensure at most one <p><br></p> follows a <pre> tag, but **do not add one automatically**
-    cleanedContent = cleanedContent.replace(/(?<=<\/pre>\s*)(<p><br><\/p>\s*)+/g, '<p><br></p>');
-
-    return cleanedContent.trim();
-};
-
-  const renderContextList = async (contexts) => {
-    contextList.innerHTML = '';
-
-    for (const context of contexts) {
-      let displayName = context.context;
-
-      if (displayName.length > MAX_CONTEXT_LENGTH) {
-        displayName = await fetchPageTitle(context.context);
+    li.addEventListener('click', () => {
+      // Save existing note before switching
+      if (currentContext) {
+        const existingContent = quill.root.innerHTML;
+        saveNotes(currentContext, existingContent); // Save immediately without waiting
       }
 
-      const listItem = document.createElement('li');
-      listItem.textContent = displayName;
-      listItem.className = 'context-item';
-      listItem.dataset.contextId = context.context;
-      listItem.title = displayName;
-
-      listItem.addEventListener('click', async () => {
-        console.log(`📥 Fetching notes for selected context: ${context.context}`);
-      
-        if (currentContext) {
-          await saveNotes(currentContext.context, quill.root.innerHTML);
-        }
-      
-        const selected = document.querySelector('.context-item.selected');
-        if (selected) selected.classList.remove('selected');
-        listItem.classList.add('selected');
-      
-        // ✅ Set currentContext first before using it
-        currentContext = context;
-      
-        // ✅ Ensure the link is properly updated
-        if (currentContext && currentContext.context) {
-          currentContextDisplay.textContent = displayName;
-          currentContextDisplay.href = currentContext.context.startsWith('http')
-            ? currentContext.context
-            : `https://${currentContext.context}`;
-        } else {
-          console.error("❌ Error: currentContext is null or undefined.");
-        }
-      
-        await fetchNotesForContext(context.context);
+      // Highlight selected context
+      document.querySelectorAll('.context-item').forEach(item => {
+        item.classList.remove('selected');
       });
+      li.classList.add('selected');
 
-      contextList.appendChild(listItem);
+      currentContext = contextObj.context;
+      contextLabel.textContent = currentContext;
+
+      const notesHtml = contextObj.notes.map(n => n.content).join('');
+      quill.root.innerHTML = notesHtml;
+
+      quill.off('text-change');
+      quill.on('text-change', () => {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          const content = quill.root.innerHTML;
+          saveNotes(currentContext, content);
+        }, 500);
+      });
+    });
+
+    container.appendChild(li);
+  });
+}
+
+// Remove a card from DOM and update focus
+function removeContextCard(context) {
+  const card = document.querySelector(`[data-context="${context}"]`);
+  if (card) {
+    const previousCard = card.previousElementSibling;
+    const nextCard = card.nextElementSibling;
+    card.remove();
+
+    const targetCard = previousCard || nextCard;
+    if (targetCard) {
+      const targetContext = targetCard.dataset.context;
+      const targetContextData = contextList.find(c => c.context === targetContext);
+
+      if (targetContextData) {
+        // Simulate click on the new context
+        targetCard.click();
+      }
+    } else {
+      // No remaining context cards
+      document.getElementById('current-context').textContent = 'Select a context';
+      const editorElement = document.querySelector('.ql-editor');
+      if (editorElement) editorElement.innerHTML = '';
     }
-  };
-
-  initializeQuill();
-  await fetchAllNotes();
-});
+  }
+}
