@@ -1,7 +1,14 @@
+const { spawn } = require('child_process')
 const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron')
+const fs = require('fs')
+const { execSync } = require('child_process')
 const path = require('path')
 const { getActiveAppContext } = require('./active-window')
 const { systemPreferences } = require('electron')
+const isDev = !app.isPackaged;
+
+let backendProcess = null
+let backendPort = 8000; // default fallback
 
 if (!systemPreferences.isTrustedAccessibilityClient(false)) {
   console.log('Requesting Accessibility permissions...')
@@ -12,13 +19,19 @@ app.setName('Overnote')
 
 app.on('quit', () => {
   console.log('Application is terminating...')
-  stopPolling();
+  stopPolling()
+  if (backendProcess) {
+    backendProcess.kill();
+  }
   app.quit()
 })
 
 app.on('before-quit', () => {
   app.isQuitting = true
   stopPolling()
+  if (backendProcess) {
+    backendProcess.kill();
+  }
 })
 
 app.dock.setIcon(path.join(__dirname, '../public', 'icon.png'))
@@ -29,32 +42,32 @@ let currentContext = ''
 let allNotesWindow = null
 
 // Polling Control
-let pollingInterval = null;
-let previousContext = '';
+let pollingInterval = null
+let previousContext = ''
 
 function startPolling() {
-  if (pollingInterval) return;
-  console.log('▶️ Starting context polling...');
+  if (pollingInterval) return
+  console.log('▶️ Starting context polling...')
   pollingInterval = setInterval(async () => {
     try {
-      const context = await getCurrentContext();
-      if (notesWindow && notesWindow.isFocused()) return;
+      const context = await getCurrentContext()
+      if (notesWindow && notesWindow.isFocused()) return
       if (context !== previousContext) {
-        previousContext = context;
-        console.log('Active app changed to:', context);
-        await updateNotesWindowTitle(context);
+        previousContext = context
+        console.log('Active app changed to:', context)
+        await updateNotesWindowTitle(context)
       }
     } catch (error) {
-      console.warn('⚠️ Failed to fetch context during polling:', error.message);
+      console.warn('⚠️ Failed to fetch context during polling:', error.message)
     }
-  }, 500);
+  }, 500)
 }
 
 function stopPolling() {
   if (pollingInterval) {
-    console.log('⏸️ Pausing context polling...');
-    clearInterval(pollingInterval);
-    pollingInterval = null;
+    console.log('⏸️ Pausing context polling...')
+    clearInterval(pollingInterval)
+    pollingInterval = null
   }
 }
 
@@ -70,6 +83,15 @@ if (!ipcMain.eventNames().includes('get-current-context')) {
     }
   })
 }
+
+ipcMain.on('request-toggle-always-on-top', (event) => {
+  if (notesWindow) {
+    const isAlwaysOnTop = !notesWindow.isAlwaysOnTop();
+    notesWindow.setAlwaysOnTop(isAlwaysOnTop);
+    console.log(`⬆️ Always on Top set to: ${isAlwaysOnTop}`);
+    event.sender.send('update-always-on-top', isAlwaysOnTop);
+  }
+});
 
 ipcMain.on('toggle-always-on-top', (event, isAlwaysOnTop) => {
   if (notesWindow) {
@@ -93,11 +115,16 @@ async function getCurrentContext() {
 // Update window title + context
 async function updateNotesWindowTitle(context) {
   try {
+    if (context === 'Overnote' && currentContext) {
+      console.log('Context was Overnote; keeping current context:', currentContext);
+      context = currentContext;
+    }
+
     if (context && context !== currentContext) {
-      currentContext = context
+      currentContext = context;
       if (notesWindow) {
-        notesWindow.setTitle(`${currentContext}`)
-        notesWindow.webContents.send('update-context', currentContext)
+        notesWindow.setTitle(`${currentContext}`);
+        notesWindow.webContents.send('update-context', currentContext);
       }
     } else {
       console.log('No update needed. Current context:', currentContext)
@@ -128,27 +155,33 @@ function createNotesWindow() {
   }
 
   if (notesWindow && !notesWindow.isDestroyed()) {
-    notesWindow.hide(); // Prevent visual flash of old data
+    notesWindow.hide() // Prevent visual flash of old data
 
     getCurrentContext()
       .then((context) => {
-        console.log('Forcing full refresh of notes window for context:', context);
-        currentContext = '';
+        console.log(
+          'Forcing full refresh of notes window for context:',
+          context
+        )
+        currentContext = ''
 
         notesWindow.webContents.once('did-finish-load', () => {
-          console.log('✅ Notes window finished loading, sending updated context:', context);
-          updateNotesWindowTitle(context);
-          notesWindow.show(); // Only show after update
-        });
+          console.log(
+            '✅ Notes window finished loading, sending updated context:',
+            context
+          )
+          updateNotesWindowTitle(context)
+          notesWindow.show() // Only show after update
+        })
 
-        notesWindow.webContents.reloadIgnoringCache();
+        notesWindow.webContents.reloadIgnoringCache()
       })
       .catch((error) => {
-        console.error('Error forcing context refresh:', error);
-        notesWindow.show(); // Ensure it doesn't remain hidden on error
-      });
+        console.error('Error forcing context refresh:', error)
+        notesWindow.show() // Ensure it doesn't remain hidden on error
+      })
 
-    return;
+    return
   }
 
   const iconPath = path.join(__dirname, '../public', 'icon.png')
@@ -161,7 +194,8 @@ function createNotesWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      additionalArguments: [`--overnote-port=${backendPort}`]
     },
     icon: iconPath
   })
@@ -191,7 +225,7 @@ function toggleNotesWindow() {
     allNotesWindow = null
   }
 
-  startPolling();
+  startPolling()
 
   const trayBounds = tray.getBounds()
   const windowBounds = notesWindow.getBounds()
@@ -214,13 +248,21 @@ function toggleNotesWindow() {
     getCurrentContext()
       .then((context) => {
         console.log('Fetched context on menu bar click:', context)
-        currentContext = ''; // Force context to refresh
+        currentContext = '' // Force context to refresh
         notesWindow.webContents.once('did-finish-load', () => {
-          console.log('✅ Notes window finished loading (from tray), sending updated context:', context);
-          updateNotesWindowTitle(context);
-        });
-        notesWindow.webContents.reloadIgnoringCache();
-        notesWindow.show();
+          console.log(
+            '✅ Notes window finished loading (from tray), sending updated context:',
+            context
+          )
+          updateNotesWindowTitle(context)
+        })
+        notesWindow.webContents.reloadIgnoringCache()
+        notesWindow.show()
+        setTimeout(() => {
+          if (notesWindow && notesWindow.webContents) {
+            notesWindow.webContents.send('update-always-on-top', notesWindow.isAlwaysOnTop());
+          }
+        }, 100);
       })
       .catch((error) => {
         console.error('Error fetching context on menu bar click:', error)
@@ -251,7 +293,8 @@ function openAllNotesWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      additionalArguments: [`--overnote-port=${backendPort}`]
     }
   })
 
@@ -266,7 +309,38 @@ function openAllNotesWindow() {
 
 // App Ready
 app.on('ready', () => {
-  const iconPath = path.join(__dirname, '../public', 'white_map_scribble_overnote_logo.png')
+  // Start the Django backend binary with SQLite DB path passed via env variable
+  const userDataPath = app.getPath('userData');
+  const sqlitePath = path.join(userDataPath, 'overnote.sqlite3');
+  
+  const backendBinaryPath = isDev
+    ? path.join(__dirname, '../../overnote_back/dist/run_backend')
+    : path.join(process.resourcesPath, 'run_backend');
+  
+    backendProcess = spawn(backendBinaryPath, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, OVERNOTE_DB_PATH: sqlitePath }
+    });
+    
+    backendProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(output);
+      const match = output.match(/Starting development server at http:\/\/127\.0\.0\.1:(\d+)/);
+      if (match) {
+        backendPort = parseInt(match[1], 10);
+        console.log(`✅ Captured backend port: ${backendPort}`);
+      }
+    });
+    
+    backendProcess.stderr.on('data', (data) => {
+      console.error(`Backend stderr: ${data}`);
+    });
+
+  const iconPath = path.join(
+    __dirname,
+    '../public',
+    'white_map_scribble_overnote_logo.png'
+  )
   tray = new Tray(iconPath)
   tray.setToolTip('Overnote - Click to open notes')
 

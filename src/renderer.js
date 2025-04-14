@@ -1,6 +1,7 @@
 const Quill = window.Quill
 const ipcRenderer = window.electron.ipcRenderer
-const BACKEND_BASE_URL = 'http://127.0.0.1:8000'
+const backendPort = window.electron?.backendPort || '8000';
+const BACKEND_BASE_URL = `http://127.0.0.1:${backendPort}`;
 
 let isLocked = false
 let lastLockedContext = null
@@ -158,6 +159,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveAllNotes([content]);
     }, 500); // Debounce time of 500ms
   });
+  
+  ipcRenderer.on('update-always-on-top', (event, isOnTop) => {
+    isAlwaysOnTop = isOnTop;
+    const alwaysOnTopButton = document.getElementById('always-on-top-button');
+    if (alwaysOnTopButton) {
+      alwaysOnTopButton.textContent = `Always on Top: ${isOnTop ? 'On' : 'Off'}`;
+    }
+  });
 
   // Handle context updates from the main process
   ipcRenderer.on('update-context', async (event, context) => {
@@ -268,11 +277,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // });
 
   const alwaysOnTopButton = document.getElementById('always-on-top-button');
-    let isAlwaysOnTop = true; // Default state
-    alwaysOnTopButton.addEventListener('click', () => {
-      isAlwaysOnTop = !isAlwaysOnTop;
-      ipcRenderer.send('toggle-always-on-top', isAlwaysOnTop);
-      alwaysOnTopButton.textContent = `Always on Top: ${isAlwaysOnTop ? 'On' : 'Off'}`;
+  let isAlwaysOnTop = true; // Default state
+  alwaysOnTopButton.addEventListener('click', () => {
+    ipcRenderer.send('request-toggle-always-on-top');
   });
 
   // Load initial notes

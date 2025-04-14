@@ -1,4 +1,5 @@
 let activeWin; // Declare activeWin variable
+let isAlwaysOnTop; // Declare isAlwaysOnTop variable
 
 let lastActiveContext = 'Unknown Context'; // Cache for last successful context
 
@@ -156,35 +157,35 @@ async function getActiveAppContext() {
       }
     }
 
-// 📌 Final Formatting:
-if (searchQuery) {
-    // Search query detected: Format as "Search Term | Site Name"
-    lastActiveContext = `${searchQuery} | ${capitalize(siteName)}`;
-} else if (title && owner && owner.name) {
-    // 🖥 Detect VS Code: Format as "FileName | VSCode"
-    if (owner.name.includes('Code')) {
+    // 📌 Final Formatting:
+    if (searchQuery) {
+      // Search query detected: Format as "Search Term | Site Name"
+      lastActiveContext = `${searchQuery} | ${capitalize(siteName)}`;
+    } else if (title && owner && owner.name) {
+      // 🖥 Detect VS Code: Format as "FileName | VSCode"
+      if (owner.name.includes('Code')) {
         // Extract file name (before the first " - " separator)
         let fileName = title.split(' - ')[0].trim();
 
         // Ensure the extracted name is not the workspace/project name
         if (!fileName.includes('.') || fileName.toLowerCase().includes('workspace')) {
-            fileName = "Untitled"; // Default for unsaved/new files
+          fileName = "Untitled"; // Default for unsaved/new files
         }
 
         lastActiveContext = `${fileName} | VSCode`;
-    }
-    // 🖥 Handle ChatGPT or other Electron-based apps safely
-    else if (owner.name.toLowerCase().includes('chatgpt')) {
+      }
+      // 🖥 Handle ChatGPT or other Electron-based apps safely
+      else if (owner.name.toLowerCase().includes('chatgpt')) {
         lastActiveContext = "ChatGPT";
-    }
-    // 🖥 Regular applications: Use "App Name"
-    else {
+      }
+      // 🖥 Regular applications: Use "App Name"
+      else {
         lastActiveContext = owner.name === "Code" ? "VSCode" : owner.name; // Rename "Code" to "VSCode"
+      }
+    } else {
+      // 🌐 Websites that aren't search results: Use the page title or URL
+      lastActiveContext = title || url || 'Unknown Context';
     }
-} else {
-    // 🌐 Websites that aren't search results: Use the page title or URL
-    lastActiveContext = title || url || 'Unknown Context';
-}
 
     return lastActiveContext;
   } catch (error) {

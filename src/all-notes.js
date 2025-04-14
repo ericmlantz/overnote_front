@@ -1,12 +1,23 @@
-const BACKEND_BASE_URL = 'http://127.0.0.1:8000';
+const backendPort = window.electron?.backendPort || '8000';
+const BACKEND_BASE_URL = `http://127.0.0.1:${backendPort}`;
 let quillInstances = {};
 let contextList = [];
+let isAlwaysOnTop = false; // Added variable to track always on top state
 
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('contexts');
   contextList = await fetchAllNotes();
 
   renderContexts(container, contextList);
+});
+
+// IPC listener for updating always on top state
+ipcRenderer.on('update-always-on-top', (event, isOnTop) => {
+  isAlwaysOnTop = isOnTop;
+  const alwaysOnTopButton = document.getElementById('always-on-top-button');
+  if (alwaysOnTopButton) {
+    alwaysOnTopButton.textContent = `Always on Top: ${isOnTop ? 'On' : 'Off'}`;
+  }
 });
 
 // Fetch all notes
@@ -121,6 +132,14 @@ function renderContexts(container, contexts) {
 
     container.appendChild(li);
   });
+
+  // Always on Top button listener
+  const alwaysOnTopButton = document.getElementById('always-on-top-button');
+  if (alwaysOnTopButton) {
+    alwaysOnTopButton.addEventListener('click', () => {
+      ipcRenderer.send('request-toggle-always-on-top');
+    });
+  }
 }
 
 // Remove a card from DOM and update focus

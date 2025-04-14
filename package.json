@@ -24,7 +24,22 @@
       "src/**/*",
       "public/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "../overnote_back/dist/run_backend",
+      {
+        "from": "../overnote_back/postgres",
+        "to": "postgres"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "../overnote_back/dist/run_backend",
+        "to": "run_backend"
+      },
+      {
+        "from": "../overnote_back/postgres",
+        "to": "postgres"
+      }
     ]
   },
   "dependencies": {
