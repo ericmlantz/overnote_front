@@ -102,21 +102,5 @@
         <div id="quill-editor"></div>
     </div>
     <script src="../src/renderer.js"></script>
-    <script>
-        let isAlwaysOnTop = false;
-
-        ipcRenderer.on('update-always-on-top', (event, isOnTop) => {
-            isAlwaysOnTop = isOnTop;
-            const alwaysOnTopButton = document.getElementById('always-on-top-button');
-            if (alwaysOnTopButton) {
-                alwaysOnTopButton.textContent = `Always on Top: ${isOnTop ? 'On' : 'Off'}`;
-            }
-        });
-
-        const alwaysOnTopButton = document.getElementById('always-on-top-button');
-        alwaysOnTopButton.addEventListener('click', () => {
-            ipcRenderer.send('request-toggle-always-on-top');
-        });
-    </script>
 </body>
 </html>

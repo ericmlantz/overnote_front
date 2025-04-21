@@ -1,23 +1,40 @@
+let quill;
 const backendPort = window.electron?.backendPort || '8000';
 const BACKEND_BASE_URL = `http://127.0.0.1:${backendPort}`;
-let quillInstances = {};
 let contextList = [];
-let isAlwaysOnTop = false; // Added variable to track always on top state
 
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('contexts');
   contextList = await fetchAllNotes();
 
-  renderContexts(container, contextList);
-});
+  const editorElement = document.getElementById('quill-editor');
+  quill = new Quill(editorElement, {
+    theme: 'snow',
+    placeholder: 'Select a context to view notes...',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'blockquote', 'code-block'],
+        ['clean']
+      ]
+    }
+  });
 
-// IPC listener for updating always on top state
-ipcRenderer.on('update-always-on-top', (event, isOnTop) => {
-  isAlwaysOnTop = isOnTop;
-  const alwaysOnTopButton = document.getElementById('always-on-top-button');
-  if (alwaysOnTopButton) {
-    alwaysOnTopButton.textContent = `Always on Top: ${isOnTop ? 'On' : 'Off'}`;
-  }
+  const Link = Quill.import('formats/link');
+  const builtInSanitize = Link.sanitize;
+
+  Link.sanitize = function (url) {
+    if (typeof url === 'string' && !/^https?:\/\//i.test(url) && !url.startsWith('mailto:') && !url.startsWith('tel:')) {
+      url = 'https://' + url;
+    }
+    return builtInSanitize.call(this, url);
+  };
+
+  Quill.register(Link, true);
+
+  renderContexts(container, contextList);
 });
 
 // Fetch all notes
@@ -78,20 +95,6 @@ function renderContexts(container, contexts) {
   const editorElement = document.getElementById('quill-editor');
   const contextLabel = document.getElementById('current-context');
 
-  const quill = new Quill(editorElement, {
-    theme: 'snow',
-    placeholder: 'Select a context to view notes...',
-    modules: {
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['link', 'blockquote', 'code-block'],
-        ['clean']
-      ]
-    }
-  });
-
   let currentContext = '';
   let saveTimeout;
 
@@ -133,12 +136,9 @@ function renderContexts(container, contexts) {
     container.appendChild(li);
   });
 
-  // Always on Top button listener
-  const alwaysOnTopButton = document.getElementById('always-on-top-button');
-  if (alwaysOnTopButton) {
-    alwaysOnTopButton.addEventListener('click', () => {
-      ipcRenderer.send('request-toggle-always-on-top');
-    });
+  const firstContextItem = container.querySelector('.context-item');
+  if (firstContextItem) {
+    firstContextItem.click();
   }
 }
 

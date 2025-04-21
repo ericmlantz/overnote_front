@@ -1,7 +1,26 @@
-let activeWin; // Declare activeWin variable
 let isAlwaysOnTop; // Declare isAlwaysOnTop variable
+let activeWin; // Declare activeWin variable
+let consecutiveFailures = 0; // Track consecutive failures
+const MAX_FAILURES_BEFORE_RESTART = 3; // Maximum failures before restart
 
 let lastActiveContext = 'Unknown Context'; // Cache for last successful context
+
+// Normalize URL by stripping out pagination, sorting, and transient query parameters
+function normalizeUrlForContext(url) {
+  try {
+    const parsedUrl = new URL(url);
+    const paramsToRemove = ['page', 'PageNum', 'pagenum', 'sort', 'SortField', 'SortDir', 'offset', 'limit', 'per_page'];
+    for (const key of [...parsedUrl.searchParams.keys()]) {
+      if (paramsToRemove.includes(key) || key.startsWith('d2l_')) {
+        parsedUrl.searchParams.delete(key);
+      }
+    }
+    return parsedUrl.origin + parsedUrl.pathname + (parsedUrl.search ? parsedUrl.search : '');
+  } catch (e) {
+    return url;
+  }
+}
+
 
 async function getActiveAppContext() {
   try {
@@ -17,6 +36,12 @@ async function getActiveAppContext() {
 
     const { title, url, owner } = activeWindow;
 
+    if (owner?.name === 'Google Chrome' && !url) {
+      console.warn('⚠️ Chrome window detected but URL is missing — likely due to missing Screen Recording permission.');
+      lastActiveContext = 'Google Chrome (URL not available)';
+      return lastActiveContext;
+    }
+    
     // Ignore the Electron app itself (Overnote app)
     if (owner && owner.name === 'Electron') {
       return 'Notes Window';
@@ -126,7 +151,7 @@ async function getActiveAppContext() {
     if (owner && owner.name === 'Google Chrome') {
       if (url) {
         // Use the URL as the context unless a predefined site is detected
-        lastActiveContext = predefinedSiteContext(url, title) || url;
+        lastActiveContext = predefinedSiteContext(url, title) || normalizeUrlForContext(url);
         return lastActiveContext;
       }
     }
@@ -189,9 +214,18 @@ async function getActiveAppContext() {
 
     return lastActiveContext;
   } catch (error) {
+    consecutiveFailures++;
     console.error('❌ Error fetching active window context:', error.message);
     console.error('🔧 Ensure the "active-win" package is installed and has the necessary permissions.');
-    return lastActiveContext || 'Fallback Context'; // Return the last known context as a fallback
+    console.warn(`⚠️ Consecutive failures: ${consecutiveFailures}`);
+    
+    if (consecutiveFailures >= MAX_FAILURES_BEFORE_RESTART) {
+      consecutiveFailures = 0;
+      // Removed the backendProcess.kill() and re-spawn logic
+      return 'Error retrieving context'; // Return error message instead of throwing
+    }
+
+    return lastActiveContext || 'Fallback Context';
   }
 }
 
