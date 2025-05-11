@@ -1,0 +1,16 @@
+{
+  "name": "overnote",
+  "description": "Context-aware notes and annotations app",
+  "author": "Eric Lantz",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "dependencies": {
+    "node": "^20.13.1",
+    "quill": "^2.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

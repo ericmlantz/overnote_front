@@ -5,55 +5,45 @@
   "version": "1.0.0",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "vite",
-    "build": "electron-builder --mac",
-    "postinstall": "electron-builder install-app-deps"
+    "start": "NODE_ENV=development electron .",
+    "build": "electron-builder --mac"
   },
   "build": {
-    "appId": "com.overnote.app",
+    "appId": "com.ericlantz.overnote",
     "productName": "Overnote",
-    "directories": {
-      "output": "dist"
+    "mac": {
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac..plist",
+      "identity": "Eric Lantz (B48SRLN4E7)"
     },
-"mac": {
-  "icon": "build/icon.icns",
-  "hardenedRuntime": false,
-  "entitlements": "null",
-  "entitlementsInherit": "null",
-  "identity": "null",
-  "provisioningProfile": null,
-  "target": [
-    {
-      "target": "dmg",
-      "arch": "arm64"
-    }
-  ],
-  "publish": null
-},
     "files": [
       "src/**/*",
       "public/**/*",
-      "node_modules/**/*",
-      "package.json",
       {
-        "from": "../overnote_back/dist/run_backend",
-        "to": "dist/run_backend"
+        "from": "../overnote_back/dist",
+        "to": "backend",
+        "filter": [
+          "run_backend"
+        ]
       },
       {
-        "from": "../overnote_back/postgres",
-        "to": "postgres"
+        "from": "public/build-helpers",
+        "to": "build-helpers"
       }
     ],
     "extraResources": [
       {
         "from": "../overnote_back/dist/run_backend",
-        "to": "run_backend"
+        "to": "backend/run_backend"
+      },
+      {
+        "from": "build-helpers/GetWindowInfo",
+        "to": "build-helpers/GetWindowInfo"
       }
     ]
   },
   "dependencies": {
-    "active-win": "^8.2.1",
     "node": "^20.13.1",
     "quill": "^2.0.3",
     "react": "^19.0.0",
