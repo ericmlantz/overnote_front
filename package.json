@@ -14,7 +14,7 @@
     "mac": {
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac..plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "identity": "Eric Lantz (B48SRLN4E7)"
     },
     "files": [
@@ -59,3 +59,4 @@
     "node": ">=20.0.0"
   }
 }
+
