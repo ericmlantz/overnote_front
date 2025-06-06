@@ -17,7 +17,7 @@ async function getActiveAppContext() {
             lastActiveContext = url || title || 'Unknown Context';
             return lastActiveContext
         }
-        return 'lastActiveContext';
+        return lastActiveContext;
     } catch (error) {
         console.error('Error fetching active window context:', error.message);
         return lastActiveContext;
