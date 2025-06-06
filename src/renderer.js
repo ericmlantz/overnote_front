@@ -163,6 +163,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 const fetchNotes = async (context) => {
   spinner.style.display = 'block';
 
+  // Overlay logic for invalid context (item-0 anywhere, Electron-related, or falsy)
+  if (
+    !context ||
+    context.toLowerCase().includes('item-0') ||
+    context.toLowerCase().includes('electron')
+  ) {
+    console.warn(`Invalid context "${context}". Showing overlay instead of loading notes.`);
+    const overlay = document.getElementById('no-context-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    quill.setText('');
+    spinner.style.display = 'none';
+    return;
+  }
+
   try {
     quill.setText('');
     quillEditor.dataset.context = context;
