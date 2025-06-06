@@ -119,6 +119,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Insert image only if the context matches the target context
           if (quillEditor.dataset.context === context) {
             quill.insertEmbed(range ? range.index : 0, 'image', base64Image);
+
+            // Immediately persist the note with the newly inserted image
+            const html = quill.root.innerHTML.trim();
+            saveAllNotes([html]);
           } else {
             console.warn(
               `Context mismatch: expected ${context} but found ${quillEditor.dataset.context}`
@@ -188,11 +192,18 @@ const saveAllNotes = async (allContent) => {
     if (!context) return;
 
     const requestData = JSON.stringify({ notes: allContent, context });
-    await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: requestData,
     });
+
+    if (response.ok) {
+      savedContexts.add(context);
+    } else {
+      const errorText = await response.text();
+      console.error(`Failed to save notes: ${errorText}`);
+    }
   } catch (error) {
     console.error('Error saving notes:', error.message);
   }
