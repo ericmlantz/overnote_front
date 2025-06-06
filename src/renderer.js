@@ -57,21 +57,80 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.head.appendChild(style)
 
   /////////////////////////////////////////////////////////////////////////
-  // Initialize Quill editor with specified theme and toolbar configuration
+  // Initialize Quill editor with custom toolbar including attachImage button
   /////////////////////////////////////////////////////////////////////////
   const quill = new Quill('#quill-editor', {
-    theme: 'snow', // Use Quill's Snow theme
+    theme: 'snow',
     placeholder: 'Write your notes here...',
     modules: {
       toolbar: [
-        [{ header: [1, 2, 3, false] }], // Header options
-        ['bold', 'italic', 'underline', 'strike'], // Text formatting options
-        [{ list: 'ordered' }, { list: 'bullet' }], // List options
-        ['link', 'blockquote', 'code-block'], // Link, blockquote, and code block options
-        ['clean'] // Clear formatting option
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image', 'code-block'],
+        ['attachImage'], // Custom button for attaching images
+        ['clean']
       ]
     }
-  })
+  });
+
+  // Add custom handler for attachImage button
+  const toolbar = quill.getModule('toolbar');
+  toolbar.addHandler('attachImage', async () => {
+    try {
+      // Determine the most recently active, valid context
+      const currentContext = quillEditor.dataset.context;
+      const isValidContext =
+        currentContext &&
+        currentContext !== 'item-0' &&
+        !currentContext.includes('Electron');
+
+      const targetContext = isValidContext ? currentContext : lastValidContext;
+
+      if (!targetContext) {
+        console.warn('No valid context found for attaching the image.');
+        return;
+      }
+
+      console.log(`Attaching image to context: ${targetContext}`);
+
+      // Open the file dialog to select an image
+      const filePath = await ipcRenderer.invoke('attach-image');
+
+      if (filePath) {
+        console.log(`Image selected: ${filePath}`);
+        insertImageToQuill(filePath, targetContext);
+      }
+    } catch (error) {
+      console.error('Error attaching image:', error);
+    }
+  });
+
+  // Function to insert image into Quill editor
+  function insertImageToQuill(filePath, context) {
+    fetch(`file://${filePath}`)
+      .then(res => res.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Image = e.target.result;
+          const range = quill.getSelection();
+
+          // Insert image only if the context matches the target context
+          if (quillEditor.dataset.context === context) {
+            quill.insertEmbed(range ? range.index : 0, 'image', base64Image);
+          } else {
+            console.warn(
+              `Context mismatch: expected ${context} but found ${quillEditor.dataset.context}`
+            );
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(error => {
+        console.error('Error reading file as base64:', error);
+      });
+  }
 
   /////////////////////////////////////////////////////////////////////////
   // Quill Link Format and adding https://

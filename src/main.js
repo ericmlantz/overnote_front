@@ -523,3 +523,43 @@ const windowHelperPath = isDev
   /////////////////////////////////////
   createNotesWindow() // Create the notes window
 })
+
+// ================================
+// Attachment Handling (Image/File)
+// ================================
+const { ipcMain: _ipcMain, dialog: _dialog, shell: _shell } = require('electron');
+const _path = require('path');
+
+// Handle Image Attachment
+ipcMain.handle('attach-image', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Select an Image',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif'] }]
+  });
+  if (!canceled && filePaths.length > 0) {
+    return filePaths[0];
+  }
+  return null;
+});
+
+// Handle File Attachment
+ipcMain.handle('attach-file', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Select a File',
+    properties: ['openFile']
+  });
+  if (!canceled && filePaths.length > 0) {
+    return filePaths[0];
+  }
+  return null;
+});
+
+// Handle Opening Files
+ipcMain.handle('open-file', async (event, filePath) => {
+  try {
+    await shell.openPath(filePath);
+  } catch (error) {
+    console.error(`Failed to open file: ${filePath}`, error.message);
+  }
+});
