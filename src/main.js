@@ -180,13 +180,14 @@ async function getCurrentContext() {
 async function updateNotesWindowTitle(context) {
   // Function to update the notes window title and context
   try {
-    if (context === 'Overnote' && currentContext) {
+    const normalizedContext = normalizeContext(context);
+    if (normalizedContext === 'Overnote' && currentContext) {
       // If context is Overnote
       console.log(
         'Context was Overnote; keeping current context:',
         currentContext
-      ) // Log current context
-      context = currentContext // Keep current context
+      )
+      context = currentContext
     }
 
     // Load user-defined alias map if available
@@ -200,21 +201,19 @@ async function updateNotesWindowTitle(context) {
       console.warn('Could not load context alias map:', err.message);
     }
 
-    let displayContext = aliasMap[context] || context;
+    let displayContext = aliasMap[normalizedContext] || normalizedContext;
 
-    if (context && context !== currentContext) {
-      // If context is valid and different from current context
-      currentContext = context // Update current context
+    if (normalizedContext && normalizedContext !== currentContext) {
+      currentContext = normalizedContext
       if (notesWindow) {
-        // If notes window exists
-        notesWindow.setTitle(`${displayContext}`) // Set the window title using displayContext
-        notesWindow.webContents.send('update-context', displayContext) // Send updated context to renderer
+        notesWindow.setTitle(`${displayContext}`)
+        notesWindow.webContents.send('update-context', normalizedContext)
       }
     } else {
-      console.log('No update needed. Current context:', currentContext) // Log that no update is needed
+      console.log('No update needed. Current context:', currentContext)
     }
   } catch (error) {
-    console.error('Error updating notes window title:', error) // Log error
+    console.error('Error updating notes window title:', error)
   }
 }
 

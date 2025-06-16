@@ -9,6 +9,39 @@ const savedContexts = new Set()
 let isLocked = false // Indicates whether the notes are locked to a specific context
 let lastLockedContext = null // Stores the context to which notes are locked
 let lastValidContext = null // Keeps track of the last valid context for fallback
+
+// Normalize context for consistent identification (search, wiki, etc.)
+function normalizeContext(rawContext) {
+  try {
+    const url = new URL(rawContext);
+
+    if (url.hostname.includes('google.') && url.pathname === '/search') {
+      const query = url.searchParams.get('q') || '';
+      return `search:google:${query}`;
+    }
+    if (url.hostname.includes('bing.') && url.pathname === '/search') {
+      const query = url.searchParams.get('q') || '';
+      return `search:bing:${query}`;
+    }
+    if (url.hostname.includes('duckduckgo.')) {
+      const query = url.searchParams.get('q') || '';
+      return `search:duckduckgo:${query}`;
+    }
+    if (url.hostname.includes('wikipedia.')) {
+      return `wiki:${url.pathname}`;
+    }
+    if (url.hostname.includes('linkedin.')) {
+      return `linkedin:${url.pathname}`;
+    }
+    if (url.hostname.includes('salesforce.')) {
+      return `salesforce:${url.pathname}${url.search}`;
+    }
+
+    return url.href;
+  } catch {
+    return rawContext;
+  }
+}
 const ignoredTitles = ['History', 'Downloads', 'Settings', 'New Tab'] // Titles to ignore for context updates
 const notesMap = new Map() // Map to store notes associated with different contexts
 
@@ -163,13 +196,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 const fetchNotes = async (context) => {
   spinner.style.display = 'block';
 
+  // Normalize context for consistent identification
+  const normalized = normalizeContext(context);
+  console.log(`🧭 Normalized context: ${normalized}`);
   // Overlay logic for invalid context (item-0 anywhere, Electron-related, or falsy)
   if (
-    !context ||
-    context.toLowerCase().includes('item-0') ||
-    context.toLowerCase().includes('electron')
+    !normalized ||
+    normalized.toLowerCase().includes('item-0') ||
+    normalized.toLowerCase().includes('electron')
   ) {
-    console.warn(`Invalid context "${context}". Showing overlay instead of loading notes.`);
+    console.warn(`Invalid context "${normalized}". Showing overlay instead of loading notes.`);
     const overlay = document.getElementById('no-context-overlay');
     if (overlay) overlay.style.display = 'flex';
     quill.setText('');
@@ -179,18 +215,20 @@ const fetchNotes = async (context) => {
 
   try {
     quill.setText('');
-    quillEditor.dataset.context = context;
+    quillEditor.dataset.context = normalized;
+    context = normalized;
 
     const response = await fetch(
-      `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(context)}`
+      `${BACKEND_BASE_URL}/api/notes?context=${encodeURIComponent(normalized)}`
     );
 
     if (!response.ok) {
-      console.warn(`No notes found for context: ${context}`);
+      console.warn(`No notes found for context: ${normalized}`);
       return;
     }
 
     const notes = await response.json();
+    console.log(`📝 Notes fetched for '${context}':`, notes);
     const combinedNotes = notes.map((note) => note.content).join('');
     quill.root.innerHTML = combinedNotes;
   } catch (error) {
@@ -204,8 +242,8 @@ const saveAllNotes = async (allContent) => {
   try {
     const context = quillEditor.dataset.context;
     if (!context) return;
-
-    const requestData = JSON.stringify({ notes: allContent, context });
+    const normalized = normalizeContext(context);
+    const requestData = JSON.stringify({ notes: allContent, context: normalized });
     const response = await fetch(`${BACKEND_BASE_URL}/api/notes/update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -213,7 +251,7 @@ const saveAllNotes = async (allContent) => {
     });
 
     if (response.ok) {
-      savedContexts.add(context);
+      savedContexts.add(normalized);
     } else {
       const errorText = await response.text();
       console.error(`Failed to save notes: ${errorText}`);
@@ -290,6 +328,10 @@ const saveAllNotes = async (allContent) => {
     }
 
     console.log(`Context updated to: ${context}`)
+
+    // Normalize context before assignment
+    const normalized = normalizeContext(context);
+    quillEditor.dataset.context = normalized;
 
     if (isLocked) {
       console.log(

@@ -10,7 +10,45 @@ function normalizeContext(context) {
     // Handle URLs
     if (context.startsWith('http')) {
       const urlObj = new URL(context);
-      return `${urlObj.hostname}${urlObj.pathname}`;
+
+      // Handle Google search
+      if (urlObj.hostname.includes('google.') && urlObj.pathname === '/search') {
+        const query = urlObj.searchParams.get('q') || '';
+        // Google
+        return `Google Search : ${query}`;
+      }
+
+      // Handle Bing search
+      if (urlObj.hostname.includes('bing.') && urlObj.pathname === '/search') {
+        const query = urlObj.searchParams.get('q') || '';
+        // Bing
+        return `Bing Search : ${query}`;
+      }
+
+      // Handle DuckDuckGo search
+      if (urlObj.hostname.includes('duckduckgo.')) {
+        const query = urlObj.searchParams.get('q') || '';
+        // DuckDuckGo
+        return `DuckDuckGo Search : ${query}`;
+      }
+
+      // Handle Wikipedia article
+      if (urlObj.hostname.includes('wikipedia.')) {
+        return `wiki:${urlObj.pathname}`;
+      }
+
+      // Handle LinkedIn profile or company pages
+      if (urlObj.hostname.includes('linkedin.')) {
+        return `linkedin:${urlObj.pathname}`;
+      }
+
+      // Handle Salesforce unique paths
+      if (urlObj.hostname.includes('salesforce.')) {
+        return `salesforce:${urlObj.pathname}${urlObj.search}`;
+      }
+
+      // Default fallback to full URL
+      return urlObj.href;
     }
 
     // Handle file paths by extracting the absolute path
